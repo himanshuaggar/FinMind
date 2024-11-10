@@ -51,33 +51,31 @@ def calculate_financial_metrics(data):
 # Function to generate financial advice
 def generate_financial_advice(metrics, data, query):
     prompt = f"""
-    As a financial advisor, analyze the following financial situation and provide specific recommendations:
+    As a personal financial advisor, provide brief, goal-oriented advice for this query:
 
-    Financial Metrics:
-    - Monthly Income: ₹{data['income']}
-    - Total Monthly Expenses: ₹{metrics['total_expenses']}
-    - Total Investments: ₹{metrics['total_investments']}
-    - Total Debts: ₹{metrics['total_debts']}
-    - Monthly Savings: ₹{metrics['monthly_savings']}
-    - Debt-to-Income Ratio: {metrics['debt_to_income']:.1f}%
-    - Savings Rate: {metrics['savings_rate']:.1f}%
+    User's Financial Goals:
+    {json.dumps(data['goals'], indent=2)}
 
-    Detailed Breakdown:
-    - Expenses: {json.dumps(data['expenses'], indent=2)}
-    - Investments: {json.dumps(data['investments'], indent=2)}
-    - Debts: {json.dumps(data['debts'], indent=2)}
-    - Financial Goals: {json.dumps(data['goals'], indent=2)}
+    Current Financial Snapshot:
+    - Monthly Income: ₹{data['income']:,}
+    - Monthly Expenses: ₹{metrics['total_expenses']:,}
+    - Monthly Savings: ₹{metrics['monthly_savings']:,}
+    - Total Investments: ₹{metrics['total_investments']:,}
+    - Total Debts: ₹{metrics['total_debts']:,}
 
     User Query: {query}
 
-    Provide specific, actionable advice addressing:
-    1. Analysis of current financial situation
-    2. Specific recommendations based on the query
-    3. Potential risks and their mitigation
-    4. Short-term and long-term action items
-    5. Impact of following these recommendations
+    Provide a response that:
+    1. Directly answers the specific question
+    2. Links advice to their stated financial goals if it related to them
+    3. Gives actionable steps with specific numbers with maximum 5 actionable steps if required
+    4. Uses simple language and bullet points
+    5. Keeps total response under 300 to 400 words
 
-    Keep the response clear, practical, and focused on the user's query.
+    Format the response as:
+    • Direct answer to query
+    • if required , give 2-3 specific action items with numbers
+    • Connection to relevant financial goal(s)
     """
     
     try:
