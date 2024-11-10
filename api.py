@@ -1,195 +1,180 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Response
 from fastapi.middleware.cors import CORSMiddleware
-import yfinance as yf
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, Union
 from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+import os
+import json
+from datetime import datetime
 
-app = FastAPI(title="Indian Stock Financial Advisor API")
 
-# Add CORS middleware
+
+# Import functionality from other files
+from analyser import (
+    ChatGoogleGenerativeAI,
+    GoogleGenerativeAIEmbeddings,
+    RetrievalQA,
+    FAISS,
+    UnstructuredURLLoader,
+    PyPDFLoader,
+    RecursiveCharacterTextSplitter,
+    PromptTemplate
+)
+from chat import (
+    calculate_financial_metrics,
+    generate_financial_advice,
+    genai
+)
+from recommend import (
+    fetch_latest_price,
+    fetch_historical_data,
+    fetch_fundamentals,
+    generate_stock_recommendation,
+    generate_detailed_advice
+)
+
+app = FastAPI(title="FinMind API", description="Financial Analysis and Advisory API")
+
+origins = [
+    "http://localhost",
+    "http://localhost:3000",  # If using React
+    "http://127.0.0.1:5173",  # If using Vite
+    "*"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-def fetch_latest_price(symbol: str) -> Optional[float]:
-    try:
-        stock = yf.Ticker(symbol)
-        data = stock.history(period="1d")
-        if data.empty:
-            return None
-        latest_price = float(data['Close'].iloc[-1])
-        return latest_price
-    except Exception as e:
-        print(f"Error fetching data for {symbol}: {e}")
-        return None
+# Pydantic models for request/response validation
+class FinancialData(BaseModel):
+    income: float
+    expenses: Dict[str, float]
+    savings: float
+    investments: Dict[str, float]
+    debts: Dict[str, float]
+    goals: List[str]
 
-def fetch_historical_data(symbol: str, period: str = "10d") -> Optional[pd.DataFrame]:
-    try:
-        stock = yf.Ticker(symbol)
-        data = stock.history(period=period)
-        return data if not data.empty else None
-    except Exception as e:
-        print(f"Error fetching historical data for {symbol}: {e}")
-        return None
+class ChatRequest(BaseModel):
+    message: str
+    financial_data: FinancialData
 
-def fetch_fundamentals(symbol: str) -> Optional[Dict[str, Union[float, str]]]:
+class StockRequest(BaseModel):
+    symbol: str
+
+class DocumentAnalysisRequest(BaseModel):
+    urls: List[str]
+    analysis_type: str
+    query: str
+
+# API endpoints
+@app.post("/chat/advice")
+async def get_financial_advice(request: ChatRequest):
     try:
-        stock = yf.Ticker(symbol)
-        info = stock.info
+        metrics = calculate_financial_metrics(request.financial_data.dict())
+        response = generate_financial_advice(
+            metrics, 
+            request.financial_data.dict(), 
+            request.message
+        )
+        return {"advice": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/stocks/analysis")
+async def get_stock_analysis(request: StockRequest, response: Response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    try:
+        latest_price = fetch_latest_price(request.symbol)
+        historical_data = fetch_historical_data(request.symbol)
+        fundamentals = fetch_fundamentals(request.symbol)
+        recommendation = generate_stock_recommendation(fundamentals)
+        detailed_advice = generate_detailed_advice(request.symbol)
         
-        fundamentals = {
-            "PE Ratio": info.get("trailingPE", "N/A"),
-            "EPS": info.get("epsTrailingTwelveMonths", "N/A"),
-            "Market Cap": info.get("marketCap", "N/A"),
-            "Dividend Yield": info.get("dividendYield", "N/A"),
-            "Revenue": info.get("totalRevenue", "N/A"),
-            "Profit Margin": info.get("profitMargins", "N/A"),
-            "Debt-to-Equity Ratio": info.get("debtToEquity", "N/A"),
-            "Return on Equity": info.get("returnOnEquity", "N/A")
+        return {
+            "symbol": request.symbol,
+            "latest_price": latest_price,
+            "recommendation": recommendation,
+            "detailed_advice": detailed_advice,
+            "fundamentals": fundamentals
         }
-        return fundamentals
     except Exception as e:
-        print(f"Error fetching fundamentals for {symbol}: {e}")
-        return None
+        raise HTTPException(status_code=500, detail=str(e))
 
-def generate_stock_recommendation(fundamentals: Dict[str, Any]) -> str:
-    if not fundamentals:
-        return "Unable to generate recommendation due to missing data"
+@app.post("/documents/analyze")
+async def analyze_documents(
+    files: List[UploadFile] = File(None),
+    urls: str = Form(None),
+    analysis_type: str = Form(...),
+    query: str = Form(...)
+):
+    try:
+        documents = []
+        
+        # Process URLs if provided
+        if urls:
+            url_list = json.loads(urls)
+            if url_list:
+                loader = UnstructuredURLLoader(urls=url_list)
+                documents.extend(loader.load())
 
-    pe_ratio = fundamentals.get('PE Ratio')
-    dividend_yield = fundamentals.get('Dividend Yield')
-    debt_to_equity = fundamentals.get('Debt-to-Equity Ratio')
-    return_on_equity = fundamentals.get('Return on Equity')
-    profit_margin = fundamentals.get('Profit Margin')
+        # Process uploaded files
+        if files:
+            for file in files:
+                temp_path = f"temp_{file.filename}"
+                with open(temp_path, "wb") as f:
+                    content = await file.read()
+                    f.write(content)
+                loader = PyPDFLoader(temp_path)
+                documents.extend(loader.load())
+                os.remove(temp_path)
 
-    # Convert string 'N/A' to None for proper comparison
-    pe_ratio = None if pe_ratio == 'N/A' else pe_ratio
-    dividend_yield = None if dividend_yield == 'N/A' else dividend_yield
-    debt_to_equity = None if debt_to_equity == 'N/A' else debt_to_equity
-    return_on_equity = None if return_on_equity == 'N/A' else return_on_equity
-    profit_margin = None if profit_margin == 'N/A' else profit_margin
+        # Process documents
+        text_splitter = RecursiveCharacterTextSplitter(
+            separators=['\n\n', '\n', '.', ','],
+            chunk_size=1000
+        )
+        docs = text_splitter.split_documents(documents)
 
-    if pe_ratio is not None:
-        if float(pe_ratio) > 25:
-            return "Overvalued, Consider Selling"
-        elif float(pe_ratio) < 15:
-            return "Undervalued, Consider Buying"
-    
-    if dividend_yield is not None:
-        if float(dividend_yield) < 0.02:
-            return "Low Dividend Yield, Hold or Sell"
-        elif float(dividend_yield) > 0.05:
-            return "High Dividend Yield, Good for Income, Hold"
-    
-    if debt_to_equity is not None:
-        if float(debt_to_equity) > 1:
-            return "High Debt, Riskier, Avoid or Sell"
-        elif float(debt_to_equity) < 0.5:
-            return "Low Debt, Low Risk, Good for Long-Term Hold"
-    
-    if return_on_equity is not None:
-        if float(return_on_equity) < 0:
-            return "Negative ROE, Risky, Avoid"
-        elif float(return_on_equity) > 15:
-            return "Strong ROE, Hold or Buy"
-    
-    if profit_margin is not None:
-        if float(profit_margin) < 0:
-            return "Negative Profit Margin, Avoid"
-        elif float(profit_margin) > 0.2:
-            return "High Profit Margin, Good Financial Health"
-    
-    return "Neutral"
+        # Create embeddings and vector store
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        vectorstore = FAISS.from_documents(docs, embeddings)
 
-class StockPrice(BaseModel):
-    symbol: str
-    latest_price: float
+        # Initialize LLM and create chain
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-pro",
+            temperature=0.7
+        )
 
-class StockAdvice(BaseModel):
-    symbol: str
-    latest_price: Optional[float]
-    price_trends: Dict[str, Dict[str, Union[float, str]]]
-    fundamentals: Dict[str, Union[float, str]]
-    recommendation: str
-    detailed_advice: str
+        # Get analysis prompt
+        analysis_prompt = get_analysis_prompt(analysis_type)
+        
+        chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=vectorstore.as_retriever(),
+            return_source_documents=True,
+            chain_type_kwargs={"prompt": analysis_prompt}
+        )
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to Indian Stock Financial Advisor API"}
+        # Get analysis results
+        result = chain({"query": query})
 
-@app.get("/price/{symbol}", response_model=StockPrice)
-async def get_stock_price(symbol: str):
-    latest_price = fetch_latest_price(symbol)
-    if latest_price is None:
-        raise HTTPException(status_code=404, detail=f"Could not fetch price for {symbol}")
-    return StockPrice(symbol=symbol, latest_price=latest_price)
+        return {
+            "analysis": result["result"],
+            "sources": [doc.metadata.get("source", "") for doc in result["source_documents"]]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/advice/{symbol}", response_model=StockAdvice)
-async def get_stock_advice(symbol: str):
-    latest_price = fetch_latest_price(symbol)
-    if latest_price is None:
-        raise HTTPException(status_code=404, detail=f"Could not fetch data for {symbol}")
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-    periods = {
-        "week": "5d",
-        "month": "1mo",
-        "6months": "6mo",
-        "year": "1y",
-        "5years": "5y"
-    }
-
-    price_trends = {}
-    for period_name, period_value in periods.items():
-        data = fetch_historical_data(symbol, period=period_value)
-        if data is not None and not data.empty:
-            start_price = float(data['Close'].iloc[0])
-            end_price = float(data['Close'].iloc[-1])
-            change = ((end_price - start_price) / start_price) * 100
-            price_trends[period_name] = {
-                "end_price": end_price,
-                "change_percentage": round(change, 2)
-            }
-        else:
-            price_trends[period_name] = {
-                "end_price": 0.0,
-                "change_percentage": 0.0
-            }
-
-    fundamentals = fetch_fundamentals(symbol)
-    if fundamentals is None:
-        raise HTTPException(status_code=404, detail=f"Could not fetch fundamentals for {symbol}")
-    
-    recommendation = generate_stock_recommendation(fundamentals)
-
-    detailed_advice = (
-        "Based on the analysis of the stock's recent trends and its fundamentals, "
-        "you should consider the company's long-term stability, growth potential, "
-        "and your own risk tolerance before making any decisions."
-    )
-
-    return StockAdvice(
-        symbol=symbol,
-        latest_price=latest_price,
-        price_trends=price_trends,
-        fundamentals=fundamentals,
-        recommendation=recommendation,
-        detailed_advice=detailed_advice
-    )
-
-@app.get("/historical/{symbol}")
-async def get_historical_data(symbol: str, period: str = "6mo"):
-    data = fetch_historical_data(symbol, period=period)
-    if data is None:
-        raise HTTPException(status_code=404, detail=f"Could not fetch historical data for {symbol}")
-    
-    return {
-        "symbol": symbol,
-        "period": period,
-        "data": data.to_dict(orient="records")
-    }
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
