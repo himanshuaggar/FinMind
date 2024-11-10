@@ -57,7 +57,39 @@ Please provide specific numbers and year-over-year comparisons.`,
 4. Operational Risks
 5. Regulatory Risks
 Provide specific examples and potential impact assessments.`,
-    // ... (add other templates as in main.py)
+    "Market Trends":
+      `Analyze the following market aspects:
+1. Industry Growth Trends
+2. Market Share Analysis
+3. Consumer Behavior Shifts
+4. Technology Impact
+5. Future Market Projections
+Include specific data points and market statistics.`,
+    "Competitive Analysis":
+      `Provide analysis of:
+1. Major Competitors
+2. Market Position
+3. Competitive Advantages
+4. Market Share Comparison
+5. Strategic Initiatives
+Include specific competitor comparisons and market data.`,
+    "Regulatory Compliance":
+      `Evaluate:
+1. Current Compliance Status
+2. Regulatory Requirements
+3. Recent/Upcoming Regulatory Changes
+4. Compliance Costs
+5. Potential Regulatory Risks
+Highlight specific regulations and their impact.`,
+    "Investment Opportunities":
+      `Analyze:
+1. Growth Potential
+2. Investment Risks
+3. Valuation Metrics
+4. Market Opportunity
+5. Strategic Advantages
+Provide specific investment metrics and potential returns.`
+    ,
   };
 
   // Effect to update query template when analysis type changes
@@ -79,11 +111,11 @@ Provide specific examples and potential impact assessments.`,
   const handleFileUpload = async (e) => {
     const selectedFiles = Array.from(e.target.files);
     setFiles(selectedFiles);
-    
+
     for (const file of selectedFiles) {
       const formData = new FormData();
       formData.append('file', file);
-      
+
       try {
         setProcessingStatus(`Processing ${file.name}...`);
         await axios.post('http://localhost:8000/api/upload-pdf', formData);
@@ -110,10 +142,10 @@ Provide specific examples and potential impact assessments.`,
     setLoading(true);
     setError(null);
     setResult(null);
-    
+
     try {
       const validUrls = urls.filter(url => url.trim());
-      
+
       if (!validUrls.length && !files.length) {
         throw new Error("Please provide at least one URL or upload a document");
       }
@@ -141,11 +173,11 @@ Provide specific examples and potential impact assessments.`,
   return (
     <div className="App">
       <h1>FinanceGPT: Financial Research Assistant 📈</h1>
-      
+
       <div className="main-container">
         <div className="sidebar">
           <h2>Document Sources</h2>
-          <button 
+          <button
             className="process-button"
             onClick={handleProcessDocuments}
           >
@@ -229,7 +261,7 @@ Provide specific examples and potential impact assessments.`,
               placeholder="Enter your question here..."
             />
 
-            <button 
+            <button
               className="analyze-button"
               onClick={handleAnalyze}
               disabled={loading}
@@ -256,14 +288,14 @@ Provide specific examples and potential impact assessments.`,
               <div className="analysis-result">
                 {result.result}
               </div>
-              
+
               {analysisType === 'Financial Metrics Analysis' && (
                 <div className="visualization-section">
                   <h3>Key Metrics Visualization</h3>
                   {/* Visualization components will go here */}
                 </div>
               )}
-              
+
               <h3>Sources</h3>
               <ul className="sources-list">
                 {result.sources.map((source, index) => (
