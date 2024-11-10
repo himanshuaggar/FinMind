@@ -15,7 +15,6 @@ function App() {
   const [competitors, setCompetitors] = useState([]);
   const [processingStatus, setProcessingStatus] = useState('');
 
-  // Constants
   const analysisTypes = [
     'Financial Metrics Analysis',
     'Risk Assessment',
@@ -92,7 +91,6 @@ Provide specific investment metrics and potential returns.`
     ,
   };
 
-  // Effect to update query template when analysis type changes
   useEffect(() => {
     if (analysisType !== 'Custom Query') {
       setQuery(queryTemplates[analysisType] || '');

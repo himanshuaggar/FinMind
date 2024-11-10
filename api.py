@@ -1,33 +1,14 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, Union
 from pydantic import BaseModel
-from typing import List, Optional
-import os
-import uvicorn
-import logging
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain.chains import RetrievalQA
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import UnstructuredURLLoader, PyPDFLoader
-from langchain.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
-from dotenv import load_dotenv
-import tempfile
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI(title="Indian Stock Financial Advisor API")
 
-# Load environment variables
-load_dotenv()
-
-# Verify API key
-if not os.getenv("GOOGLE_API_KEY"):
-    raise ValueError("GOOGLE_API_KEY not found in environment variables")
-
-app = FastAPI(title="FinanceGPT API")
-
-# Configure CORS
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,248 +17,179 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pydantic models
-class AnalysisRequest(BaseModel):
-    urls: Optional[List[str]] = []
-    analysis_type: str
-    query: str
-
-class AnalysisResponse(BaseModel):
-    result: str
-    sources: List[str]
-
-# Initialize LLM
-try:
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-pro",
-        temperature=0.7,
-        google_api_key=os.getenv("GOOGLE_API_KEY")
-    )
-except Exception as e:
-    logger.error(f"Error initializing LLM: {str(e)}")
-    raise
-
-# Add this variable at the top with other globals
-file_path = "faiss_store_finance"
-
-# Create template
-template = """You are a financial analyst expert. Use the following information to answer the question at the end.
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
-
-When analyzing financial data:
-- Provide specific numbers and metrics when available
-- Compare with industry standards if relevant
-- Highlight key risks and opportunities
-- Consider both quantitative and qualitative factors
-
-Context: {context}
-Question: {question}
-Detailed Analysis:"""
-
-PROMPT = PromptTemplate(
-    template=template,
-    input_variables=["context", "question"]
-)
-
-@app.post("/api/analyze", response_model=AnalysisResponse)
-async def analyze_documents(request: AnalysisRequest):
+def fetch_latest_price(symbol: str) -> Optional[float]:
     try:
-        logger.info(f"Starting analysis request: {request}")
-        
-        # Validate input
-        if not request.query:
-            logger.warning("Empty query received")
-            raise HTTPException(status_code=400, detail="Query cannot be empty")
-        
-        # Check if vector store exists
-        if not os.path.exists(file_path):
-            logger.warning("No processed documents found")
-            return AnalysisResponse(
-                result="Please upload and process documents first.",
-                sources=[]
-            )
-        
-        try:
-            # Load the existing vector store
-            logger.info("Loading vector store")
-            embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001",
-                google_api_key=os.getenv("GOOGLE_API_KEY")
-            )
-            vectorstore = FAISS.load_local(
-                file_path, 
-                embeddings,
-                allow_dangerous_deserialization=True
-            )
-            
-            # Get the appropriate analysis prompt
-            analysis_prompt = get_analysis_prompt(request.analysis_type)
-            
-            # Create retrieval chain
-            logger.info("Creating retrieval chain")
-            chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                chain_type="stuff",
-                retriever=vectorstore.as_retriever(
-                    search_kwargs={"k": 3}
-                ),
-                return_source_documents=True,
-                chain_type_kwargs={"prompt": analysis_prompt}
-            )
-            
-            # Run the analysis
-            logger.info(f"Running analysis with query: {request.query}")
-            result = chain({"query": request.query})
-            logger.info("Analysis completed successfully")
-
-            # Extract sources
-            sources = []
-            if "source_documents" in result:
-                sources = list(set(
-                    doc.metadata.get("source", "") 
-                    for doc in result["source_documents"]
-                    if doc.metadata.get("source")
-                ))
-                logger.info(f"Found {len(sources)} unique sources")
-
-            return AnalysisResponse(
-                result=result.get("result", "No results found"),
-                sources=sources
-            )
-
-        except Exception as e:
-            logger.error(f"Error during analysis: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=500,
-                detail={"error": str(e), "step": "analysis"}
-            )
-
-    except HTTPException as he:
-        raise he
+        stock = yf.Ticker(symbol)
+        data = stock.history(period="1d")
+        if data.empty:
+            return None
+        latest_price = float(data['Close'].iloc[-1])
+        return latest_price
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail={"error": str(e), "step": "unexpected"}
-        )
+        print(f"Error fetching data for {symbol}: {e}")
+        return None
 
-# Add a simple test endpoint
-@app.get("/api/test")
-async def test_endpoint():
-    return {"status": "ok", "message": "API is working"}
-
-@app.post("/api/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
+def fetch_historical_data(symbol: str, period: str = "10d") -> Optional[pd.DataFrame]:
     try:
-        logger.info(f"Receiving PDF upload: {file.filename}")
-        
-        # Validate file type
-        if not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-        
-        documents = []
-        
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-            content = await file.read()
-            tmp.write(content)
-            tmp_path = tmp.name
-        
-        try:
-            # Process PDF
-            logger.info("Processing PDF file")
-            loader = PyPDFLoader(tmp_path)
-            documents.extend(loader.load())
-            
-            # Split documents
-            text_splitter = RecursiveCharacterTextSplitter(
-                separators=['\n\n', '\n', '.', ','],
-                chunk_size=1000
-            )
-            docs = text_splitter.split_documents(documents)
-            
-            # Create embeddings
-            embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001",
-                google_api_key=os.getenv("GOOGLE_API_KEY")
-            )
-            
-            # Create or update vector store
-            if os.path.exists(file_path):
-                # Load existing store and add new documents
-                existing_store = FAISS.load_local(
-                    file_path, 
-                    embeddings,
-                    allow_dangerous_deserialization=True
-                )
-                existing_store.add_documents(docs)
-                vectorstore = existing_store
-            else:
-                # Create new store
-                vectorstore = FAISS.from_documents(docs, embeddings)
-            
-            # Save the updated store
-            vectorstore.save_local(file_path)
-            
-            # Clean up
-            os.unlink(tmp_path)
-            
-            return {
-                "message": "PDF processed successfully",
-                "pages": len(documents)
-            }
-            
-        except Exception as e:
-            logger.error(f"Error processing PDF: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
-            
-    except HTTPException as he:
-        raise he
+        stock = yf.Ticker(symbol)
+        data = stock.history(period=period)
+        return data if not data.empty else None
     except Exception as e:
-        logger.error(f"Unexpected error in PDF upload: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+        print(f"Error fetching historical data for {symbol}: {e}")
+        return None
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-# Add the analysis prompt function from main.py
-def get_analysis_prompt(analysis_type):
-    base_template = """You are a financial expert specialized in {analysis_type}. 
-    Analyze the provided information and give a detailed response.
-    
-    When analyzing, consider:
-    {specific_considerations}
-    
-    Context: {context}
-    Question: {question}
-    
-    Provide a structured analysis with:
-    1. Key Findings
-    2. Detailed Analysis
-    3. Supporting Data
-    4. Recommendations
-    """
-    
-    specific_considerations = {
-        "Financial Metrics Analysis": """
-        - Revenue trends and growth rates
-        - Profitability metrics
-        - Return metrics (ROE, ROA)
-        - Liquidity ratios
-        - Cash flow analysis""",
-        # ... (add other considerations as in main.py)
-    }
-    
-    return PromptTemplate(
-        template=base_template,
-        input_variables=["context", "question"],
-        partial_variables={
-            "analysis_type": analysis_type,
-            "specific_considerations": specific_considerations.get(analysis_type, "")
+def fetch_fundamentals(symbol: str) -> Optional[Dict[str, Union[float, str]]]:
+    try:
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        fundamentals = {
+            "PE Ratio": info.get("trailingPE", "N/A"),
+            "EPS": info.get("epsTrailingTwelveMonths", "N/A"),
+            "Market Cap": info.get("marketCap", "N/A"),
+            "Dividend Yield": info.get("dividendYield", "N/A"),
+            "Revenue": info.get("totalRevenue", "N/A"),
+            "Profit Margin": info.get("profitMargins", "N/A"),
+            "Debt-to-Equity Ratio": info.get("debtToEquity", "N/A"),
+            "Return on Equity": info.get("returnOnEquity", "N/A")
         }
+        return fundamentals
+    except Exception as e:
+        print(f"Error fetching fundamentals for {symbol}: {e}")
+        return None
+
+def generate_stock_recommendation(fundamentals: Dict[str, Any]) -> str:
+    if not fundamentals:
+        return "Unable to generate recommendation due to missing data"
+
+    pe_ratio = fundamentals.get('PE Ratio')
+    dividend_yield = fundamentals.get('Dividend Yield')
+    debt_to_equity = fundamentals.get('Debt-to-Equity Ratio')
+    return_on_equity = fundamentals.get('Return on Equity')
+    profit_margin = fundamentals.get('Profit Margin')
+
+    # Convert string 'N/A' to None for proper comparison
+    pe_ratio = None if pe_ratio == 'N/A' else pe_ratio
+    dividend_yield = None if dividend_yield == 'N/A' else dividend_yield
+    debt_to_equity = None if debt_to_equity == 'N/A' else debt_to_equity
+    return_on_equity = None if return_on_equity == 'N/A' else return_on_equity
+    profit_margin = None if profit_margin == 'N/A' else profit_margin
+
+    if pe_ratio is not None:
+        if float(pe_ratio) > 25:
+            return "Overvalued, Consider Selling"
+        elif float(pe_ratio) < 15:
+            return "Undervalued, Consider Buying"
+    
+    if dividend_yield is not None:
+        if float(dividend_yield) < 0.02:
+            return "Low Dividend Yield, Hold or Sell"
+        elif float(dividend_yield) > 0.05:
+            return "High Dividend Yield, Good for Income, Hold"
+    
+    if debt_to_equity is not None:
+        if float(debt_to_equity) > 1:
+            return "High Debt, Riskier, Avoid or Sell"
+        elif float(debt_to_equity) < 0.5:
+            return "Low Debt, Low Risk, Good for Long-Term Hold"
+    
+    if return_on_equity is not None:
+        if float(return_on_equity) < 0:
+            return "Negative ROE, Risky, Avoid"
+        elif float(return_on_equity) > 15:
+            return "Strong ROE, Hold or Buy"
+    
+    if profit_margin is not None:
+        if float(profit_margin) < 0:
+            return "Negative Profit Margin, Avoid"
+        elif float(profit_margin) > 0.2:
+            return "High Profit Margin, Good Financial Health"
+    
+    return "Neutral"
+
+class StockPrice(BaseModel):
+    symbol: str
+    latest_price: float
+
+class StockAdvice(BaseModel):
+    symbol: str
+    latest_price: Optional[float]
+    price_trends: Dict[str, Dict[str, Union[float, str]]]
+    fundamentals: Dict[str, Union[float, str]]
+    recommendation: str
+    detailed_advice: str
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Indian Stock Financial Advisor API"}
+
+@app.get("/price/{symbol}", response_model=StockPrice)
+async def get_stock_price(symbol: str):
+    latest_price = fetch_latest_price(symbol)
+    if latest_price is None:
+        raise HTTPException(status_code=404, detail=f"Could not fetch price for {symbol}")
+    return StockPrice(symbol=symbol, latest_price=latest_price)
+
+@app.get("/advice/{symbol}", response_model=StockAdvice)
+async def get_stock_advice(symbol: str):
+    latest_price = fetch_latest_price(symbol)
+    if latest_price is None:
+        raise HTTPException(status_code=404, detail=f"Could not fetch data for {symbol}")
+
+    periods = {
+        "week": "5d",
+        "month": "1mo",
+        "6months": "6mo",
+        "year": "1y",
+        "5years": "5y"
+    }
+
+    price_trends = {}
+    for period_name, period_value in periods.items():
+        data = fetch_historical_data(symbol, period=period_value)
+        if data is not None and not data.empty:
+            start_price = float(data['Close'].iloc[0])
+            end_price = float(data['Close'].iloc[-1])
+            change = ((end_price - start_price) / start_price) * 100
+            price_trends[period_name] = {
+                "end_price": end_price,
+                "change_percentage": round(change, 2)
+            }
+        else:
+            price_trends[period_name] = {
+                "end_price": 0.0,
+                "change_percentage": 0.0
+            }
+
+    fundamentals = fetch_fundamentals(symbol)
+    if fundamentals is None:
+        raise HTTPException(status_code=404, detail=f"Could not fetch fundamentals for {symbol}")
+    
+    recommendation = generate_stock_recommendation(fundamentals)
+
+    detailed_advice = (
+        "Based on the analysis of the stock's recent trends and its fundamentals, "
+        "you should consider the company's long-term stability, growth potential, "
+        "and your own risk tolerance before making any decisions."
     )
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    return StockAdvice(
+        symbol=symbol,
+        latest_price=latest_price,
+        price_trends=price_trends,
+        fundamentals=fundamentals,
+        recommendation=recommendation,
+        detailed_advice=detailed_advice
+    )
+
+@app.get("/historical/{symbol}")
+async def get_historical_data(symbol: str, period: str = "6mo"):
+    data = fetch_historical_data(symbol, period=period)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"Could not fetch historical data for {symbol}")
+    
+    return {
+        "symbol": symbol,
+        "period": period,
+        "data": data.to_dict(orient="records")
+    }
