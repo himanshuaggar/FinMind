@@ -52,6 +52,7 @@ elif page == "FinanceGPT":
     # Add tabs for different input types
     tab1, tab2 = st.tabs(["News Articles", "Financial Reports"])
 
+    # News Articles Tab
     with tab1:
         st.subheader("Add Financial News URLs")
         urls = []
