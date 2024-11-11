@@ -23,7 +23,7 @@ def fetch_latest_price(symbol):
         return None
 
 # Function to fetch historical data (last 10 days for trend analysis)
-def fetch_historical_data(symbol, period="10d"):
+def fetch_historical_data(symbol, period="1mo"):
     try:
         stock = yf.Ticker(symbol)
         data = stock.history(period=period)
