@@ -17,36 +17,237 @@ from langchain.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Verify API key is loaded
 if not os.getenv("GOOGLE_API_KEY"):
     raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
-# Set the page configuration
-st.set_page_config(page_title="Financial Assistant App", layout="wide")
+st.set_page_config(
+    page_title="Financial Assistant App",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Sidebar for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Select a Page:", ["Home", "FinanceGPT", "Financial Advisory Chatbot", "Stock Financial Advisor"])
+st.markdown("""
+    <style>
+        .main {
+            padding: 2rem;
+        }
+          .nav-button {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            margin: 0.5rem 0;
+            border: none;
+            border-radius: 0.5rem;
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            text-align: left;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .nav-button:hover {
+            background-color: #e9ecef;
+            transform: translateX(5px);
+        }
+        .nav-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .nav-icon {
+            font-size: 1.2rem;
+            min-width: 24px;
+        }
+        .sidebar .sidebar-content {
+            background-color: #f8f9fa;
+        }
+        .nav-separator {
+            height: 1px;
+            background-color: #dee2e6;
+            margin: 1rem 0;
+        }
+        .stButton>button {
+            width: 100%;
+            border-radius: 8px;
+            height: 3em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            transition: all 0.3s ease;
+        }
+        .stButton>button:hover {
+            background-color: #45a049;
+            color:#000;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .sidebar .sidebar-content {
+            background-color: #f8f9fa;
+        }
+        h1 {
+            color: #2c3e50;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+        h2 {
+            color: #34495e;
+            font-weight: 600;
+        }
+        .feature-card {
+            padding: 1.5rem;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+            transition: transform 0.3s ease;
+            color: black;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-# Home Page
-if page == "Home":
-    st.title("Welcome to the Financial Assistant App")
-    st.write("""
-    This application provides various tools to assist you with financial research, advisory, and stock analysis.
+# Initialize session state for current page if not exists
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "Home"
+
+def change_page(page):
+    st.session_state.current_page = page
+    # Force a rerun to update the UI
+    st.rerun()
+
+with st.sidebar:
+    st.title("🎯 Navigate To")
+    st.markdown("---")
     
-    - **FinanceGPT**: A financial research assistant that helps you analyze financial documents and news articles.
-    - **Financial Advisory Chatbot**: A chatbot that provides personalized financial advice based on your financial data.
-    - **Stock Financial Advisor Tool**: A tool to analyze stock performance and provide recommendations based on financial metrics.
-    
-    Use the sidebar to navigate to the desired feature.
-    """)
+    # Navigation buttons
+    if st.button("🏠 Home", key="home_btn", 
+                 help="Return to home page",
+                 use_container_width=True,
+                 type="primary" if st.session_state.current_page == "Home" else "secondary"):
+        change_page("Home")
+        
+    if st.button("🤖 Finance AI Analyst", key="finance_gpt_btn",
+                 help="AI-powered financial research assistant",
+                 use_container_width=True,
+                 type="primary" if st.session_state.current_page == "Finance AI Analyst" else "secondary"):
+        change_page("Finance AI Analyst")
+        
+    if st.button("💬 Financial Advisory", key="advisory_btn",
+                 help="Get personalized financial advice",
+                 use_container_width=True,
+                 type="primary" if st.session_state.current_page == "Financial Advisory Chatbot" else "secondary"):
+        change_page("Financial Advisory Chatbot")
+        
+    if st.button("📈 Stock Advisor", key="stock_advisor_btn",
+                 help="Analyze stocks and get investment advice",
+                 use_container_width=True,
+                 type="primary" if st.session_state.current_page == "Stock Financial Advisor" else "secondary"):
+        change_page("Stock Financial Advisor")
 
-# FinanceGPT Page
-elif page == "FinanceGPT":
-    st.title("FinanceGPT: Financial Research Assistant 📈")
+if st.session_state.current_page == "Home":
+    st.title("🚀 Welcome to Smart Finance Assistant")
+    st.markdown("""
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 2rem; 
+                    border-radius: 15px; 
+                    color: white; 
+                    margin-bottom: 2rem;'>
+            <h2 style='color: white';'>Your Personal Financial Journey Starts Here</h2>
+            <p style='font-size: 1.1rem;'>
+                Empowering you with AI-driven financial insights, personalized advice, and comprehensive market analysis.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Feature cards in columns
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("""
+            <div class='feature-card'>
+                <div class='feature-icon'>🤖</div>
+                <h3 style='color: black;'>Finance AI Analyst</h3>
+                <p style='color: black;'>Advanced AI-powered research assistant for analyzing financial documents and market trends.</p>
+                <ul style='list-style-type: none; padding-left: 0;'>
+                    <li>✓ Document Analysis</li>
+                    <li>✓ Market Research</li>
+                    <li>✓ Trend Insights</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+            <div class='feature-card'>
+                <div class='feature-icon'>💡</div>
+                <h3 style='color: black; margin:0; padding:0;'>Financial Advisory</h3>
+                <p style='color: black;'>Personal financial advisor powered by AI to help you make informed decisions.</p>
+                <ul style='list-style-type: none; padding-left: 0;'>
+                    <li>✓ Personalized Advice</li>
+                    <li>✓ Goal Planning</li>
+                    <li>✓ Budget Analysis</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown("""
+            <div class='feature-card'>
+                <div class='feature-icon'>📈</div>
+                <h3 style='color: black;'>Stock Advisor</h3>
+                <p style='color: black;'>Real-time stock analysis and intelligent investment recommendations.</p>
+                <ul style='list-style-type: none; padding-left: 0;'>
+                    <li>✓ Market Analysis</li>
+                    <li>✓ Stock Insights</li>
+                    <li>✓ Investment Tips</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Quick start guide
+    st.markdown("---")
+    st.header("🚀 Quick Start Guide")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+            <div style='padding: 1.5rem; background: #f8f9fa; border-radius: 10px; color:#000;'>
+                <h3>Getting Started</h3>
+                <ol>
+                    <li>Choose your desired tool from the navigation menu</li>
+                    <li>Input your financial data or questions</li>
+                    <li>Receive personalized insights and recommendations</li>
+                    <li>Make informed financial decisions</li>
+                </ol>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+            <div style='padding: 1.5rem; background: #f8f9fa; border-radius: 10px;color:#000;'>
+                <h3>Key Features</h3>
+                <ul>
+                    <li>AI-Powered Financial Analysis</li>
+                    <li>Real-time Market Data</li>
+                    <li>Personalized Advisory Services</li>
+                    <li>Comprehensive Stock Analysis</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
+# Finance AI Analyst Page
+elif st.session_state.current_page== "Finance AI Analyst":
+    st.title("Finance AI Analyst: Financial Research Assistant 📈")
     st.sidebar.title("Document Sources")
 
     # Add tabs for different input types
@@ -339,7 +540,7 @@ elif page == "FinanceGPT":
                 st.markdown(f"- {source}")
 
 # Financial Advisory Chatbot Page
-elif page == "Financial Advisory Chatbot":
+elif st.session_state.current_page == "Financial Advisory Chatbot":
     import google.generativeai as genai
 
     # Configure Gemini API
@@ -554,7 +755,7 @@ elif page == "Financial Advisory Chatbot":
             st.session_state.chat_history.append({"role": "assistant", "content": response})
 
 # Stock Financial Advisor Tool Page
-elif page == "Stock Financial Advisor":
+elif st.session_state.current_page == "Stock Financial Advisor":
     st.title("Stock Financial Advisor")
     st.sidebar.title("Enter Stock Symbol")
 
