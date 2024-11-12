@@ -136,12 +136,12 @@ with st.sidebar:
         change_page("Home")
         
     if st.button("🤖 Finance AI Analyst", key="finance_gpt_btn",
-                 help="AI-powered financial research assistant",
+                 help="AI powered financial research assistant",
                  use_container_width=True,
                  type="primary" if st.session_state.current_page == "Finance AI Analyst" else "secondary"):
         change_page("Finance AI Analyst")
         
-    if st.button("💬 Financial Advisory", key="advisory_btn",
+    if st.button("💬 Financial Advisory Chatbot", key="advisory_btn",
                  help="Get personalized financial advice",
                  use_container_width=True,
                  type="primary" if st.session_state.current_page == "Financial Advisory Chatbot" else "secondary"):
@@ -154,7 +154,7 @@ with st.sidebar:
         change_page("Stock Financial Advisor")
 
 if st.session_state.current_page == "Home":
-    st.title("🚀 Welcome to Smart Finance Assistant")
+    st.title("Welcome to FinAnalytiQ - A Smart Finance Assistant 🚀")
     st.markdown("""
         <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                     padding: 2rem; 
@@ -163,7 +163,7 @@ if st.session_state.current_page == "Home":
                     margin-bottom: 2rem;'>
             <h2 style='color: white';'>Your Personal Financial Journey Starts Here</h2>
             <p style='font-size: 1.1rem;'>
-                Empowering you with AI-driven financial insights, personalized advice, and comprehensive market analysis.
+                Empowering you with AI driven financial insights, personalized advice, and comprehensive market analysis.
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -176,7 +176,7 @@ if st.session_state.current_page == "Home":
             <div class='feature-card'>
                 <div class='feature-icon'>🤖</div>
                 <h3 style='color: black;'>Finance AI Analyst</h3>
-                <p style='color: black;'>Advanced AI-powered research assistant for analyzing financial documents and market trends.</p>
+                <p style='color: black;'>Advanced AI powered research assistant for analyzing financial documents and market trends.</p>
                 <ul style='list-style-type: none; padding-left: 0;'>
                     <li>✓ Document Analysis</li>
                     <li>✓ Market Research</li>
@@ -189,7 +189,7 @@ if st.session_state.current_page == "Home":
         st.markdown("""
             <div class='feature-card'>
                 <div class='feature-icon'>💡</div>
-                <h3 style='color: black; margin:0; padding:0;'>Financial Advisory</h3>
+                <h3 style='color: black; margin:0; padding:0;'>Financial Advisory Chatbot</h3>
                 <p style='color: black;'>Personal financial advisor powered by AI to help you make informed decisions.</p>
                 <ul style='list-style-type: none; padding-left: 0;'>
                     <li>✓ Personalized Advice</li>
@@ -204,7 +204,7 @@ if st.session_state.current_page == "Home":
             <div class='feature-card'>
                 <div class='feature-icon'>📈</div>
                 <h3 style='color: black;'>Stock Advisor</h3>
-                <p style='color: black;'>Real-time stock analysis and intelligent investment recommendations.</p>
+                <p style='color: black;'>Stock analysis and intelligent investment recommendations.</p>
                 <ul style='list-style-type: none; padding-left: 0;'>
                     <li>✓ Market Analysis</li>
                     <li>✓ Stock Insights</li>
@@ -237,8 +237,8 @@ if st.session_state.current_page == "Home":
             <div style='padding: 1.5rem; background: #f8f9fa; border-radius: 10px;color:#000;'>
                 <h3>Key Features</h3>
                 <ul>
-                    <li>AI-Powered Financial Analysis</li>
-                    <li>Real-time Market Data</li>
+                    <li>AI Powered Financial Analysis</li>
+                    <li>Market Data Analysis</li>
                     <li>Personalized Advisory Services</li>
                     <li>Comprehensive Stock Analysis</li>
                 </ul>
@@ -246,32 +246,17 @@ if st.session_state.current_page == "Home":
         """, unsafe_allow_html=True)
 
 # Finance AI Analyst Page
-elif st.session_state.current_page== "Finance AI Analyst":
+elif st.session_state.current_page == "Finance AI Analyst":
     st.title("Finance AI Analyst: Financial Research Assistant 📈")
-    st.sidebar.title("Document Sources")
 
     # Add tabs for different input types
     tab1, tab2 = st.tabs(["News Articles", "Financial Reports"])
 
-    # News Articles Tab
-    with tab1:
-        st.subheader("Add Financial News URLs")
-        urls = []
-        for i in range(3):
-            url = st.text_input(f"Financial News URL {i+1}", 
-                            help="Add URLs from financial news sources like Bloomberg, Reuters, etc.")
-            urls.append(url)
-
-    with tab2:
-        st.subheader("Upload Financial Documents")
-        uploaded_files = st.file_uploader(
-            "Upload company financial reports (PDF)", 
-            accept_multiple_files=True,
-            help="Upload annual reports, quarterly reports, or other financial documents"
-        )
-
-    process_clicked = st.sidebar.button("Process Documents")
-    file_path = "faiss_store_finance"
+    # Initialize session state for storing processed documents
+    if 'news_processed' not in st.session_state:
+        st.session_state.news_processed = False
+    if 'reports_processed' not in st.session_state:
+        st.session_state.reports_processed = False
 
     # Initialize the LLM
     llm = ChatGoogleGenerativeAI(
@@ -280,88 +265,14 @@ elif st.session_state.current_page== "Finance AI Analyst":
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
 
-    # Create a finance-focused prompt template
-    template = """You are a financial analyst expert. Use the following information to answer the question at the end.
-    If you don't know the answer, just say that you don't know, don't try to make up an answer.
-
-    When analyzing financial data:
-    - Provide specific numbers and metrics when available
-    - Compare with industry standards if relevant
-    - Highlight key risks and opportunities
-    - Consider both quantitative and qualitative factors
-
-    Context: {context}
-
-    Question: {question}
-
-    Detailed Analysis:"""
-
-    PROMPT = PromptTemplate(
-        template=template,
-        input_variables=["context", "question"]
-    )
-
-    if process_clicked:
-        documents = []
-        
-        # Process URLs if provided
-        if any(urls):
-            loader = UnstructuredURLLoader(urls=[url for url in urls if url])
-            st.text("Loading news articles...✅")
-            documents.extend(loader.load())
-
-        # Process PDFs if uploaded
-        if uploaded_files:
-            for file in uploaded_files:
-                temp_path = f"temp_{file.name}"
-                with open(temp_path, "wb") as f:
-                    f.write(file.getvalue())
-                loader = PyPDFLoader(temp_path)
-                st.text(f"Processing {file.name}...✅")
-                documents.extend(loader.load())
-                os.remove(temp_path)
-
-        # Split documents
-        text_splitter = RecursiveCharacterTextSplitter(
-            separators=['\n\n', '\n', '.', ','],
-            chunk_size=1000
-        )
-        st.text("Processing documents...✅")
-        docs = text_splitter.split_documents(documents)
-
-        # Create embeddings
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        vectorstore_finance = FAISS.from_documents(docs, embeddings)
-        st.text("Creating knowledge base...✅")
-        time.sleep(2)
-
-        # Save the FAISS index
-        vectorstore_finance.save_local(file_path)
-        st.text("Ready to answer questions about your documents! 🚀")
-
-    # Update the query types and templates section
-    st.sidebar.markdown("## Analysis Type")
-    analysis_type = st.sidebar.selectbox(
-        "Select Analysis Type:",
-        [
-            "Financial Metrics Analysis",
-            "Risk Assessment",
-            "Market Trends",
-            "Competitive Analysis",
-            "Regulatory Compliance",
-            "Investment Opportunities",
-            "Custom Query"
-        ]
-    )
-
-    # Enhanced query templates for each analysis type
+    # Query templates for financial report analysis
     query_templates = {
         "Financial Metrics Analysis": {
             "template": """Analyze the following financial metrics:
             1. Revenue and Growth
             2. Profit Margins
             3. ROE and ROA
-            4. Debt-to-Equity Ratio
+            4. Debt to Equity Ratio
             5. Working Capital
             Please provide specific numbers and year-over-year comparisons."""
         },
@@ -415,7 +326,7 @@ elif st.session_state.current_page== "Finance AI Analyst":
         }
     }
 
-    # Create a more detailed prompt template based on analysis type
+    # Function to get analysis prompt based on analysis type
     def get_analysis_prompt(analysis_type):
         base_template = """You are a financial expert specialized in {analysis_type}. 
         Analyze the provided information and give a detailed response.
@@ -474,7 +385,14 @@ elif st.session_state.current_page== "Finance AI Analyst":
             - Valuation metrics
             - Risk-return profile
             - Market opportunities
-            - Investment timeline"""
+            - Investment timeline""",
+            
+            "Custom Query": """
+            - Relevant metrics
+            - Key data points
+            - Industry context
+            - Historical trends
+            - Future implications"""
         }
         
         return PromptTemplate(
@@ -486,59 +404,221 @@ elif st.session_state.current_page== "Finance AI Analyst":
             }
         )
 
-    # Update the query interface
-    if analysis_type == "Custom Query":
-        query = st.text_input(
-            "Your Question:",
-            value="",
-            help="Ask specific questions about the documents"
-        )
-    else:
-        query = st.text_area(
-            "Your Question:",
-            value=query_templates[analysis_type]["template"],
-            height=150,
-            help="Ask specific questions about the documents or use the template provided"
-        )
-
-    if query:
-        if os.path.exists(file_path):
-            embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-            vectorstore = FAISS.load_local(
-                file_path, 
-                embeddings,
-                allow_dangerous_deserialization=True
+    # News Articles Tab
+    with tab1:
+        st.subheader("Add Financial News URLs")
+        urls = []
+        for i in range(3):
+            url = st.text_input(f"Financial News URL {i+1}", 
+                            help="Add URLs from financial news sources like Bloomberg, Reuters, etc.",
+                            key=f"news_url_{i}")
+            urls.append(url)
+        
+        process_news = st.button("Process News Articles")
+        
+        if process_news and any(urls):
+            documents = []
+            valid_urls = [url for url in urls if url]
+            
+            try:
+                loader = UnstructuredURLLoader(urls=valid_urls)
+                st.text("Loading news articles...✅")
+                documents.extend(loader.load())
+                
+                # Split documents
+                text_splitter = RecursiveCharacterTextSplitter(
+                    separators=['\n\n', '\n', '.', ','],
+                    chunk_size=1000
+                )
+                docs = text_splitter.split_documents(documents)
+                
+                # Create embeddings
+                embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+                vectorstore_news = FAISS.from_documents(docs, embeddings)
+                vectorstore_news.save_local("faiss_store_news")
+                st.session_state.news_processed = True
+                st.text("Ready to answer questions about the news articles! 🚀")
+            
+            except Exception as e:
+                st.error(f"Error processing news articles: {str(e)}")
+                st.session_state.news_processed = False
+        
+        if st.session_state.news_processed:
+            news_query = st.text_input(
+                "Ask about the news articles:",
+                help="Enter your question about the news articles"
             )
             
-            # Use the specific prompt for the selected analysis type
-            analysis_prompt = get_analysis_prompt(analysis_type)
-            
-            chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                chain_type="stuff",
-                retriever=vectorstore.as_retriever(),
-                return_source_documents=True,
-                chain_type_kwargs={"prompt": analysis_prompt}
-            )
-            
-            with st.spinner(f'Performing {analysis_type}...'):
-                result = chain({"query": query})
-            
-            # Display the analysis with better formatting
-            st.header(f"{analysis_type} Results")
-            st.markdown(result["result"])
-            
-            # Display sources
-            st.subheader("Sources:")
-            sources = set()
-            for doc in result["source_documents"]:
-                source = doc.metadata.get("source", "")
-                if source:
-                    sources.add(source)
-            
-            for source in sources:
-                st.markdown(f"- {source}")
+            if news_query:
+                try:
+                    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+                    vectorstore = FAISS.load_local(
+                        "faiss_store_news", 
+                        embeddings,
+                        allow_dangerous_deserialization=True
+                    )
+                    
+                    # News analysis prompt template
+                    news_template = """You are a financial news analyst. Analyze the provided news articles and answer the question.
+                    Focus on extracting key information, trends, and implications from the news.
+                    
+                    Consider:
+                    - Key facts and figures
+                    - Market impact
+                    - Industry implications
+                    - Related trends
+                    - Future outlook
+                    
+                    Context: {context}
+                    Question: {question}
+                    
+                    Provide a clear and concise analysis structured as follows:
+                    1. Key Points
+                    2. Analysis
+                    3. Implications
+                    4. Related Context"""
+                    
+                    news_prompt = PromptTemplate(
+                        template=news_template,
+                        input_variables=["context", "question"]
+                    )
+                    
+                    chain = RetrievalQA.from_chain_type(
+                        llm=llm,
+                        chain_type="stuff",
+                        retriever=vectorstore.as_retriever(),
+                        return_source_documents=True,
+                        chain_type_kwargs={"prompt": news_prompt}
+                    )
+                    
+                    with st.spinner('Analyzing news articles...'):
+                        result = chain({"query": news_query})
+                    
+                    st.markdown(result["result"])
+                    
+                    # Display news sources
+                    st.subheader("News Sources:")
+                    sources = set()
+                    for doc in result["source_documents"]:
+                        source = doc.metadata.get("source", "")
+                        if source:
+                            sources.add(source)
+                    
+                    for source in sources:
+                        st.markdown(f"- {source}")
+                
+                except Exception as e:
+                    st.error(f"Error analyzing news articles: {str(e)}")
 
+    # Financial Reports Tab
+    with tab2:
+        st.subheader("Upload Financial Documents")
+        uploaded_files = st.file_uploader(
+            "Upload company financial reports (PDF)", 
+            accept_multiple_files=True,
+            help="Upload annual reports, quarterly reports, or other financial documents"
+        )
+
+        process_reports = st.button("Process Financial Reports")
+
+        if process_reports and uploaded_files:
+            documents = []
+            try:
+                for file in uploaded_files:
+                    temp_path = f"temp_{file.name}"
+                    with open(temp_path, "wb") as f:
+                        f.write(file.getvalue())
+                    loader = PyPDFLoader(temp_path)
+                    st.text(f"Processing {file.name}...✅")
+                    documents.extend(loader.load())
+                    os.remove(temp_path)
+
+                # Split documents
+                text_splitter = RecursiveCharacterTextSplitter(
+                    separators=['\n\n', '\n', '.', ','],
+                    chunk_size=1000
+                )
+                docs = text_splitter.split_documents(documents)
+
+                # Create embeddings
+                embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+                vectorstore_finance = FAISS.from_documents(docs, embeddings)
+                vectorstore_finance.save_local("faiss_store_finance")
+                st.session_state.reports_processed = True
+                st.text("Ready to Answer based on financial reports! 🚀")
+            
+            except Exception as e:
+                st.error(f"Error processing financial reports: {str(e)}")
+                st.session_state.reports_processed = False
+
+        if st.session_state.reports_processed:
+            # Analysis type selection
+            st.sidebar.markdown("## Analysis Type")
+            analysis_type = st.sidebar.selectbox(
+                "Select Analysis Type:",
+                [
+                    "Financial Metrics Analysis",
+                    "Risk Assessment",
+                    "Market Trends",
+                    "Competitive Analysis",
+                    "Regulatory Compliance",
+                    "Investment Opportunities",
+                    "Custom Query"
+                ]
+            )
+
+            if analysis_type == "Custom Query":
+                query = st.text_input(
+                    "Your Question:",
+                    value="",
+                    help="Ask specific questions about the financial reports"
+                )
+            else:
+                query = st.text_area(
+                    "Your Question:",
+                    value=query_templates[analysis_type]["template"],
+                    height=150,
+                    help="Ask specific questions about the financial reports or use the template provided"
+                )
+
+            if query:
+                try:
+                    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+                    vectorstore = FAISS.load_local(
+                        "faiss_store_finance", 
+                        embeddings,
+                        allow_dangerous_deserialization=True
+                    )
+                    
+                    analysis_prompt = get_analysis_prompt(analysis_type)
+                    
+                    chain = RetrievalQA.from_chain_type(
+                        llm=llm,
+                        chain_type="stuff",
+                        retriever=vectorstore.as_retriever(),
+                        return_source_documents=True,
+                        chain_type_kwargs={"prompt": analysis_prompt}
+                    )
+                    
+                    with st.spinner(f'Performing {analysis_type}...'):
+                        result = chain({"query": query})
+                    
+                    st.header(f"{analysis_type} Results")
+                    st.markdown(result["result"])
+                    
+                    # Display sources
+                    st.subheader("Sources:")
+                    sources = set()
+                    for doc in result["source_documents"]:
+                        source = doc.metadata.get("source", "")
+                        if source:
+                            sources.add(source)
+                    
+                    for source in sources:
+                        st.markdown(f"- {source}")
+                
+                except Exception as e:
+                    st.error(f"Error analyzing financial reports: {str(e)}")
 # Financial Advisory Chatbot Page
 elif st.session_state.current_page == "Financial Advisory Chatbot":
     import google.generativeai as genai
@@ -697,6 +777,10 @@ elif st.session_state.current_page == "Financial Advisory Chatbot":
         new_goal = st.text_input("Add a financial goal")
         if new_goal and st.button("Add Goal"):
             st.session_state.financial_data['goals'].append(new_goal)
+        if st.session_state.financial_data['goals']:
+            st.write("Current Goals:")
+            for i, goal in enumerate(st.session_state.financial_data['goals']):
+                st.write(f"{i+1}. {goal}")
         with st.sidebar:
             st.markdown("""
             ### 📝 How to Use
@@ -714,10 +798,7 @@ elif st.session_state.current_page == "Financial Advisory Chatbot":
             """)
         
         # Display current goals
-        if st.session_state.financial_data['goals']:
-            st.write("Current Goals:")
-            for i, goal in enumerate(st.session_state.financial_data['goals']):
-                st.write(f"{i+1}. {goal}")
+        
 
     # Main chat interface
     st.header("💬 Financial Advisor Chat")
@@ -807,79 +888,100 @@ elif st.session_state.current_page == "Stock Financial Advisor":
 
     # Function to generate stock recommendation based on fundamentals
     def generate_stock_recommendation(fundamentals, current_price, previous_price, trend_change):
-        recommendation = "Neutral"
+        recommendation = ""
         reasons = []
+        overall_sentiment = "neutral"  # Initialize overall sentiment
 
         # Price-to-Earnings (PE) Ratio
         pe_ratio = fundamentals.get('PE Ratio', 'N/A')
         if pe_ratio != 'N/A':
             if pe_ratio > 25:
-                recommendation = "Overvalued, Consider Selling"
-                reasons.append(f"The current PE ratio of {pe_ratio} suggests that the stock is overvalued compared to industry standards.")
+                reasons.append(f"The current PE ratio of {pe_ratio} suggests that the stock is overvalued.")
+                overall_sentiment = "sell"  # Overvalued suggests selling
             elif pe_ratio < 15:
-                recommendation = "Undervalued, Consider Buying"
-                reasons.append(f"The current PE ratio of {pe_ratio} indicates that the stock is undervalued, presenting a potential buying opportunity.")
+                reasons.append(f"The current PE ratio of {pe_ratio} indicates that the stock is undervalued.")
+                overall_sentiment = "buy"  # Undervalued suggests buying
+            else:
+                reasons.append(f"The current PE ratio of {pe_ratio} indicates that the stock is fairly valued.")
 
         # Dividend Yield
         dividend_yield = fundamentals.get('Dividend Yield', 'N/A')
         if dividend_yield != 'N/A':
             if dividend_yield < 0.02:
-                recommendation = "Low Dividend Yield, Hold or Sell"
-                reasons.append(f"With a dividend yield of {dividend_yield:.2%}, the stock offers low returns on dividends, suggesting a hold or sell strategy.")
+                reasons.append(f"With a dividend yield of {dividend_yield:.2%}, the stock offers low returns on dividends.")
+                overall_sentiment = "hold"  # Low yield suggests holding
             elif dividend_yield > 0.05:
-                recommendation = "High Dividend Yield, Good for Income, Hold"
-                reasons.append(f"A dividend yield of {dividend_yield:.2%} indicates a strong income potential, making it a good hold for income-focused investors.")
+                reasons.append(f"A dividend yield of {dividend_yield:.2%} indicates strong income potential.")
+                overall_sentiment = "buy"  # High yield suggests buying
+            else:
+                reasons.append(f"A dividend yield of {dividend_yield:.2%} is moderate.")
 
         # Debt-to-Equity Ratio
         debt_to_equity = fundamentals.get('Debt-to-Equity Ratio', 'N/A')
         if debt_to_equity != 'N/A':
             if debt_to_equity > 1:
-                recommendation = "High Debt, Riskier, Avoid or Sell"
-                reasons.append(f"The debt-to-equity ratio of {debt_to_equity} suggests high leverage, which increases financial risk.")
+                reasons.append(f"The debt-to-equity ratio of {debt_to_equity} suggests high leverage, increasing financial risk.")
+                overall_sentiment = "sell"  # High debt suggests selling
             elif debt_to_equity < 0.5:
-                recommendation = "Low Debt, Low Risk, Good for Long-Term Hold"
-                reasons.append(f"With a debt-to-equity ratio of {debt_to_equity}, the company is in a strong financial position with low risk.")
+                reasons.append(f"With a debt-to-equity ratio of {debt_to_equity}, the company is in a strong financial position.")
+                overall_sentiment = "buy"  # Low debt suggests buying
+            else:
+                reasons.append(f"The debt-to-equity ratio of {debt_to_equity} indicates moderate leverage.")
 
         # Return on Equity (ROE)
         return_on_equity = fundamentals.get('Return on Equity', 'N/A')
         if return_on_equity != 'N/A':
             if return_on_equity < 0:
-                recommendation = "Negative ROE, Risky, Avoid"
-                reasons.append("The negative return on equity indicates that the company is not generating profit from its equity, which is a red flag.")
+                reasons.append("The negative return on equity indicates that the company is not generating profit from its equity.")
+                overall_sentiment = "sell"  # Negative ROE suggests selling
             elif return_on_equity > 15:
-                recommendation = "Strong ROE, Hold or Buy"
-                reasons.append(f"An ROE of {return_on_equity}% reflects strong profitability, suggesting a buy or hold position.")
+                reasons.append(f"An ROE of {return_on_equity}% reflects strong profitability.")
+                overall_sentiment = "buy"  # Strong ROE suggests buying
+            else:
+                reasons.append(f"An ROE of {return_on_equity}% indicates moderate profitability.")
 
         # Profit Margin
         profit_margin = fundamentals.get('Profit Margin', 'N/A')
         if profit_margin != 'N/A':
             if profit_margin < 0:
-                recommendation = "Negative Profit Margin, Avoid"
-                reasons.append("A negative profit margin indicates that the company is losing money on its sales, which is concerning.")
+                reasons.append("A negative profit margin indicates that the company is losing money on its sales.")
+                overall_sentiment = "sell"  # Negative margin suggests selling
             elif profit_margin > 0.2:
-                recommendation = "High Profit Margin, Good Financial Health"
-                reasons.append(f"A profit margin of {profit_margin:.2%} suggests strong financial health and effective cost management.")
+                reasons.append(f"A profit margin of {profit_margin:.2%} suggests strong financial health.")
+                overall_sentiment = "buy"  # High margin suggests buying
+            else:
+                reasons.append(f"A profit margin of {profit_margin:.2%} indicates moderate profitability.")
 
         # Current Price vs Previous Price
         if current_price and previous_price:
             price_change = ((current_price - previous_price) / previous_price) * 100
             if price_change > 5:
-                recommendation += " - Recent price increase indicates positive market sentiment, consider holding."
                 reasons.append(f"The stock has increased by {price_change:.2f}%, reflecting positive investor sentiment.")
+                if overall_sentiment == "neutral":
+                    overall_sentiment = "hold"  # Positive change suggests holding
             elif price_change < -5:
-                recommendation += " - Recent price drop may indicate negative sentiment, consider selling or reassessing."
                 reasons.append(f"The stock has decreased by {price_change:.2f}%, which may suggest negative market sentiment.")
+                overall_sentiment = "sell"  # Negative change suggests selling
 
         # Trend Analysis
         if trend_change > 0:
-            recommendation += " - Positive trend observed, may indicate growth potential."
-            reasons.append("The positive trend indicates potential growth, making it a favorable investment.")
+            reasons.append("A positive trend indicates potential growth, making it a favorable investment.")
+            if overall_sentiment == "neutral":
+                overall_sentiment = "buy"  # Positive trend suggests buying
         elif trend_change < 0:
-            recommendation += " - Negative trend observed, caution is advised."
-            reasons.append("The negative trend suggests caution, as it may indicate underlying issues with the company.")
+            reasons.append("A negative trend suggests caution, as it may indicate underlying issues with the company.")
+            if overall_sentiment == "neutral":
+                overall_sentiment = "sell"  # Negative trend suggests selling
 
         # Final Recommendation
-        detailed_recommendation = f"{recommendation}. " + " ".join(reasons)
+        if overall_sentiment == "buy":
+            recommendation = "Overall, the stock is a good buy based on the analysis of its fundamentals and market trends."
+        elif overall_sentiment == "sell":
+            recommendation = "Overall, the stock is not recommended for purchase based on the analysis of its fundamentals and market trends."
+        else:
+            recommendation = "Overall, the stock is a hold based on the analysis of its fundamentals and market trends."
+
+        detailed_recommendation = f"{recommendation} Reasons: " + " ".join(reasons)
         return detailed_recommendation
 
     # Function to generate detailed advice
