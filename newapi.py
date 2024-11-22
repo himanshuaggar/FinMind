@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 import yfinance as yf
 import os
 from dotenv import load_dotenv
@@ -11,6 +11,7 @@ from langchain.chains import RetrievalQA
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import UnstructuredURLLoader, PyPDFLoader
 from langchain_community.vectorstores import FAISS
+import json
 
 app = FastAPI()
 
@@ -90,7 +91,7 @@ async def analyze_news(request: NewsRequest):
             )
             result = chain({"query": request.query})
             return {"result": result["result"], "sources": [doc.metadata for doc in result["source_documents"]]}
-        
+
         return {"status": "News articles processed successfully"}
     
     except Exception as e:
@@ -128,7 +129,7 @@ async def analyze_financial_reports(files: List[UploadFile] = File(...), query: 
             )
             result = chain({"query": query})
             return {"result": result["result"], "sources": [doc.metadata for doc in result["source_documents"]]}
-        
+
         return {"status": "Financial reports processed successfully"}
     
     except Exception as e:
@@ -201,3 +202,154 @@ def calculate_financial_metrics(data: FinancialData):
         'debt_to_income': debt_to_income,
         'savings_rate': savings_rate
     }
+
+def fetch_latest_price(symbol):
+    stock = yf.Ticker(symbol)
+    data = stock.history(period="1d")
+    return data['Close'][0]
+
+def fetch_historical_data(symbol):
+    stock = yf.Ticker(symbol)
+    return stock.history(period="1mo")
+
+def fetch_fundamentals(symbol):
+    stock = yf.Ticker(symbol)
+    return stock.info
+
+def generate_stock_recommendation(fundamentals, current_price, previous_price, trend_change):
+        recommendation = ""
+        reasons = []
+        overall_sentiment = "neutral"  # Initialize overall sentiment
+
+        # Price-to-Earnings (PE) Ratio
+        pe_ratio = fundamentals.get('PE Ratio', 'N/A')
+        if pe_ratio != 'N/A':
+            if pe_ratio > 25:
+                reasons.append(f"The current PE ratio of {pe_ratio} suggests that the stock is overvalued.")
+                overall_sentiment = "sell"  # Overvalued suggests selling
+            elif pe_ratio < 15:
+                reasons.append(f"The current PE ratio of {pe_ratio} indicates that the stock is undervalued.")
+                overall_sentiment = "buy"  # Undervalued suggests buying
+            else:
+                reasons.append(f"The current PE ratio of {pe_ratio} indicates that the stock is fairly valued.")
+
+        # Dividend Yield
+        dividend_yield = fundamentals.get('Dividend Yield', 'N/A')
+        if dividend_yield != 'N/A':
+            if dividend_yield < 0.02:
+                reasons.append(f"With a dividend yield of {dividend_yield:.2%}, the stock offers low returns on dividends.")
+                overall_sentiment = "hold"  # Low yield suggests holding
+            elif dividend_yield > 0.05:
+                reasons.append(f"A dividend yield of {dividend_yield:.2%} indicates strong income potential.")
+                overall_sentiment = "buy"  # High yield suggests buying
+            else:
+                reasons.append(f"A dividend yield of {dividend_yield:.2%} is moderate.")
+
+        # Debt-to-Equity Ratio
+        debt_to_equity = fundamentals.get('Debt-to-Equity Ratio', 'N/A')
+        if debt_to_equity != 'N/A':
+            if debt_to_equity > 1:
+                reasons.append(f"The debt-to-equity ratio of {debt_to_equity} suggests high leverage, increasing financial risk.")
+                overall_sentiment = "sell"  # High debt suggests selling
+            elif debt_to_equity < 0.5:
+                reasons.append(f"With a debt-to-equity ratio of {debt_to_equity}, the company is in a strong financial position.")
+                overall_sentiment = "buy"  # Low debt suggests buying
+            else:
+                reasons.append(f"The debt-to-equity ratio of {debt_to_equity} indicates moderate leverage.")
+
+        # Return on Equity (ROE)
+        return_on_equity = fundamentals.get('Return on Equity', 'N/A')
+        if return_on_equity != 'N/A':
+            if return_on_equity < 0:
+                reasons.append("The negative return on equity indicates that the company is not generating profit from its equity.")
+                overall_sentiment = "sell"  # Negative ROE suggests selling
+            elif return_on_equity > 15:
+                reasons.append(f"An ROE of {return_on_equity}% reflects strong profitability.")
+                overall_sentiment = "buy"  # Strong ROE suggests buying
+            else:
+                reasons.append(f"An ROE of {return_on_equity}% indicates moderate profitability.")
+
+        # Profit Margin
+        profit_margin = fundamentals.get('Profit Margin', 'N/A')
+        if profit_margin != 'N/A':
+            if profit_margin < 0:
+                reasons.append("A negative profit margin indicates that the company is losing money on its sales.")
+                overall_sentiment = "sell"  # Negative margin suggests selling
+            elif profit_margin > 0.2:
+                reasons.append(f"A profit margin of {profit_margin:.2%} suggests strong financial health.")
+                overall_sentiment = "buy"  # High margin suggests buying
+            else:
+                reasons.append(f"A profit margin of {profit_margin:.2%} indicates moderate profitability.")
+
+        # Current Price vs Previous Price
+        if current_price and previous_price:
+            price_change = ((current_price - previous_price) / previous_price) * 100
+            if price_change > 5:
+                reasons.append(f"The stock has increased by {price_change:.2f}%, reflecting positive investor sentiment.")
+                if overall_sentiment == "neutral":
+                    overall_sentiment = "hold"  # Positive change suggests holding
+            elif price_change < -5:
+                reasons.append(f"The stock has decreased by {price_change:.2f}%, which may suggest negative market sentiment.")
+                overall_sentiment = "sell"  # Negative change suggests selling
+
+        # Trend Analysis
+        if trend_change > 0:
+            reasons.append("A positive trend indicates potential growth, making it a favorable investment.")
+            if overall_sentiment == "neutral":
+                overall_sentiment = "buy"  # Positive trend suggests buying
+        elif trend_change < 0:
+            reasons.append("A negative trend suggests caution, as it may indicate underlying issues with the company.")
+            if overall_sentiment == "neutral":
+                overall_sentiment = "sell"  # Negative trend suggests selling
+
+        # Final Recommendation
+        if overall_sentiment == "buy":
+            recommendation = "Overall, the stock is a good buy based on the analysis of its fundamentals and market trends."
+        elif overall_sentiment == "sell":
+            recommendation = "Overall, the stock is not recommended for purchase based on the analysis of its fundamentals and market trends."
+        else:
+            recommendation = "Overall, the stock is a hold based on the analysis of its fundamentals and market trends."
+
+        detailed_recommendation = f"{recommendation} Reasons: " + " ".join(reasons)
+        return detailed_recommendation
+
+def generate_financial_advice(metrics, data, query):
+        model = genai.GenerativeModel(model_name='gemini-pro',
+                                generation_config={
+                                    'temperature': 0.7,
+                                    'top_p': 0.8,
+                                    'max_output_tokens': 2048,
+                                })
+        prompt = f"""
+        As a personal financial advisor, provide brief, goal-oriented advice for this query:
+
+        User's Financial Goals:
+        {json.dumps(data.goals, indent=2)}
+
+        Current Financial Snapshot:
+        - Monthly Income: ₹{data.income:,}
+        - Monthly Expenses: ₹{metrics['total_expenses']:,}
+        - Monthly Savings: ₹{metrics['monthly_savings']:,}
+        - Total Investments: ₹{metrics['total_investments']:,}
+        - Total Debts: ₹{metrics['total_debts']:,}
+
+        User Query: {query}
+
+        Provide a response that:
+        1. Directly answers the specific question
+        2. Links advice to their stated financial goals if it related to them
+        3. Gives actionable steps with specific numbers with maximum 5 actionable steps if required
+        4. Uses simple language and bullet points
+        5. Keeps total response under 300 to 400 words
+
+        Format the response as:
+        • Direct answer to query
+        • if required , give 2-3 specific action items with numbers
+        • Connection to relevant financial goal(s)
+        """
+        
+        try:
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            return f"Error generating advice: {str(e)}"
