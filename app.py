@@ -168,7 +168,6 @@ if st.session_state.current_page == "Home":
         </div>
     """, unsafe_allow_html=True)
 
-    # Feature cards in columns
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -213,7 +212,6 @@ if st.session_state.current_page == "Home":
             </div>
         """, unsafe_allow_html=True)
 
-    # Quick start guide
     st.markdown("---")
     st.header("🚀 Quick Start Guide")
     
@@ -623,7 +621,6 @@ elif st.session_state.current_page == "Finance AI Analyst":
 elif st.session_state.current_page == "Financial Advisory Chatbot":
     import google.generativeai as genai
 
-    # Configure Gemini API
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
     # Initialize the model
