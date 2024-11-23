@@ -1,172 +1,122 @@
-import { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from "react-native";
-import { LineChart } from "react-native-chart-kit";
-import { FontAwesome5 } from "@expo/vector-icons";
-import Animated, { FadeInDown } from "react-native-reanimated";
-import { COLORS, SIZES, SHADOWS } from "../../constants/theme";
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { COLORS, SIZES } from '../../constants/theme';
+import { Portfolio } from '../../types';
+import Loading from '../common/Loading';
 
-const screenWidth = Dimensions.get("window").width;
+interface PortfolioSummaryProps {
+  data: Portfolio | null;
+  onRefresh?: () => void;
+}
 
-export default function PortfolioSummary() {
-  const timeRanges = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
-  const [selectedRange, setSelectedRange] = useState("1M");
+export default function PortfolioSummary({ data, onRefresh }: PortfolioSummaryProps) {
+  const [selectedRange, setSelectedRange] = useState('1M');
+  const timeRanges = ['1D', '1W', '1M', '3M', '1Y', 'ALL'];
 
-  const portfolioData = {
-    "1M": {
-      labels: ["1", "7", "14", "21", "28"],
-      datasets: [{
-        data: [245000, 252000, 248000, 260000, 275000],
-      }]
-    },
-    // Add data for other time ranges
+  if (!data) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emptyText}>No portfolio data available</Text>
+      </View>
+    );
+  }
+
+  const chartData = {
+    labels: data.historicalData.slice(-30).map(item => 
+      new Date(item.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })
+    ),
+    datasets: [{
+      data: data.historicalData.slice(-30).map(item => item.value)
+    }]
   };
 
-  const stats = [
-    { label: "Total Value", value: "₹2,75,000", change: "+12.2%" },
-    { label: "Today's Gain", value: "₹5,890", change: "+2.4%" },
-    { label: "Total Gain", value: "₹30,000", change: "+12.2%" },
-  ];
-
-  const assetAllocation = [
-    { type: "Stocks", percentage: 60, color: COLORS.primary },
-    { type: "Mutual Funds", percentage: 25, color: COLORS.success },
-    { type: "Crypto", percentage: 15, color: COLORS.warning },
-  ];
-
   return (
-    <Animated.View 
-      entering={FadeInDown.duration(500)}
-      style={styles.container}
-    >
-      {/* Portfolio Header */}
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Portfolio Overview</Text>
-        <TouchableOpacity style={styles.refreshButton}>
+        <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
           <FontAwesome5 name="sync-alt" size={16} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* Portfolio Value */}
       <View style={styles.valueContainer}>
-        <Text style={styles.totalValue}>₹2,75,000</Text>
+        <Text style={styles.totalValue}>
+          ₹{data.totalValue.toLocaleString('en-IN', { 
+            maximumFractionDigits: 2 
+          })}
+        </Text>
         <View style={styles.changeContainer}>
           <FontAwesome5 
-            name="arrow-up" 
+            name={data.todayGain >= 0 ? "arrow-up" : "arrow-down"}
             size={12} 
-            color={COLORS.success} 
+            color={data.todayGain >= 0 ? COLORS.success : COLORS.error}
             style={styles.arrow}
           />
-          <Text style={styles.changeText}>12.2%</Text>
+          <Text style={[
+            styles.changeText,
+            { color: data.todayGain >= 0 ? COLORS.success : COLORS.error }
+          ]}>
+            {Math.abs(data.todayGain).toFixed(2)}%
+          </Text>
         </View>
       </View>
 
-      {/* Time Range Selector */}
-      <View style={styles.timeRangeContainer}>
-        {timeRanges.map((range) => (
-          <TouchableOpacity
-            key={range}
-            style={[
-              styles.timeRangeButton,
-              selectedRange === range && styles.selectedTimeRange
-            ]}
-            onPress={() => setSelectedRange(range)}
-          >
-            <Text style={[
-              styles.timeRangeText,
-              selectedRange === range && styles.selectedTimeRangeText
-            ]}>
-              {range}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {data.historicalData.length > 0 && (
+        <>
+          <LineChart
+            data={chartData}
+            width={Dimensions.get('window').width - 40}
+            height={220}
+            chartConfig={{
+              backgroundColor: COLORS.white,
+              backgroundGradientFrom: COLORS.white,
+              backgroundGradientTo: COLORS.white,
+              decimalPlaces: 2,
+              color: (opacity = 1) => COLORS.primary,
+              style: {
+                borderRadius: 16,
+              },
+            }}
+            bezier
+            style={styles.chart}
+          />
 
-      {/* Chart */}
-      <LineChart
-        data={portfolioData[selectedRange]}
-        width={screenWidth - SIZES.medium * 4}
-        height={180}
-        chartConfig={{
-          backgroundColor: "transparent",
-          backgroundGradientFrom: COLORS.cardBackground,
-          backgroundGradientTo: COLORS.cardBackground,
-          decimalPlaces: 0,
-          color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
-          labelColor: () => COLORS.textSecondary,
-          propsForDots: {
-            r: "4",
-            strokeWidth: "2",
-            stroke: COLORS.primary
-          },
-          propsForBackgroundLines: {
-            strokeDasharray: "", // Solid lines
-            stroke: `${COLORS.gray}20`,
-          },
-        }}
-        bezier
-        style={styles.chart}
-        withHorizontalLines={true}
-        withVerticalLines={false}
-        withDots={true}
-        withShadow={false}
-        segments={4}
-      />
-
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        {stats.map((stat, index) => (
-          <View key={index} style={styles.statItem}>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-            <Text style={styles.statValue}>{stat.value}</Text>
-            <Text style={[styles.statChange, { color: stat.change.includes('+') ? COLORS.success : COLORS.error }]}>
-              {stat.change}
-            </Text>
+          <View style={styles.timeRangeContainer}>
+            {timeRanges.map((range) => (
+              <TouchableOpacity
+                key={range}
+                style={[
+                  styles.timeRangeButton,
+                  selectedRange === range && styles.selectedTimeRange
+                ]}
+                onPress={() => setSelectedRange(range)}
+              >
+                <Text style={[
+                  styles.timeRangeText,
+                  selectedRange === range && styles.selectedTimeRangeText
+                ]}>
+                  {range}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ))}
-      </View>
+        </>
+      )}
 
-      {/* Asset Allocation */}
-      <View style={styles.allocationContainer}>
-        <Text style={styles.allocationTitle}>Asset Allocation</Text>
-        <View style={styles.allocationBar}>
-          {assetAllocation.map((asset, index) => (
-            <View
-              key={index}
-              style={[
-                styles.allocationSegment,
-                {
-                  backgroundColor: asset.color,
-                  width: `${asset.percentage}%`,
-                  borderTopLeftRadius: index === 0 ? SIZES.small : 0,
-                  borderBottomLeftRadius: index === 0 ? SIZES.small : 0,
-                  borderTopRightRadius: index === assetAllocation.length - 1 ? SIZES.small : 0,
-                  borderBottomRightRadius: index === assetAllocation.length - 1 ? SIZES.small : 0,
-                }
-              ]}
-            />
-          ))}
-        </View>
-        <View style={styles.allocationLegend}>
-          {assetAllocation.map((asset, index) => (
-            <View key={index} style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: asset.color }]} />
-              <Text style={styles.legendText}>{asset.type} ({asset.percentage}%)</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    </Animated.View>
+      {/* Rest of the component */}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: COLORS.white,
     borderRadius: SIZES.medium,
     padding: SIZES.medium,
     marginHorizontal: SIZES.medium,
     marginTop: SIZES.medium,
-    ...SHADOWS.medium,
   },
   header: {
     flexDirection: "row",
@@ -299,5 +249,12 @@ const styles = StyleSheet.create({
   legendText: {
     color: COLORS.textSecondary,
     fontSize: SIZES.small,
+  },
+  emptyText: {
+    fontSize: SIZES.medium,
+    fontWeight: "bold",
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    marginTop: SIZES.medium,
   },
 });

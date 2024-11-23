@@ -1,64 +1,89 @@
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZES } from '../../constants/theme';
 
-interface StockInfoProps {
-  fundamentals: {
-    PE_Ratio: number;
-    EPS: number;
-    Market_Cap: number;
-    Dividend_Yield: number;
-    Revenue: number;
-    Profit_Margin: number;
-    Debt_to_Equity: number;
-    ROE: number;
-  };
-}
+const formatNumber = (value: number | undefined, decimals: number = 2): string => {
+  if (value === undefined || value === null) return 'N/A';
+  return Number(value).toFixed(decimals);
+};
 
-export default function StockInfo({ fundamentals }: StockInfoProps) {
-  const formatValue = (value: number, type: string) => {
-    switch (type) {
-      case 'percentage':
-        return `${(value * 100).toFixed(2)}%`;
-      case 'currency':
-        return `₹${value.toLocaleString()}`;
-      default:
-        return value.toFixed(2);
-    }
-  };
-
-  const metrics = [
-    { label: 'P/E Ratio', value: fundamentals.PE_Ratio, type: 'number' },
-    { label: 'EPS', value: fundamentals.EPS, type: 'currency' },
-    { label: 'Market Cap', value: fundamentals.Market_Cap, type: 'currency' },
-    { label: 'Dividend Yield', value: fundamentals.Dividend_Yield, type: 'percentage' },
-    { label: 'Revenue', value: fundamentals.Revenue, type: 'currency' },
-    { label: 'Profit Margin', value: fundamentals.Profit_Margin, type: 'percentage' },
-    { label: 'Debt to Equity', value: fundamentals.Debt_to_Equity, type: 'number' },
-    { label: 'ROE', value: fundamentals.ROE, type: 'percentage' },
-  ];
+const StockInfo = ({ fundamentals }) => {
+  if (!fundamentals) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.error}>No fundamental data available</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Fundamental Analysis</Text>
-      <View style={styles.grid}>
-        {metrics.map((metric, index) => (
-          <View key={index} style={styles.metricContainer}>
-            <Text style={styles.label}>{metric.label}</Text>
-            <Text style={styles.value}>
-              {formatValue(metric.value, metric.type)}
-            </Text>
-          </View>
-        ))}
+      <Text style={styles.title}>Fundamental Data</Text>
+      
+      <View style={styles.infoRow}>
+        <Text style={styles.label}>Current Price:</Text>
+        <Text style={styles.value}>
+          {fundamentals.currency} {formatNumber(fundamentals.currentPrice)}
+        </Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.label}>52 Week Change:</Text>
+        <Text style={styles.value}>
+          {formatNumber(fundamentals['52WeekChange'] * 100)}%
+        </Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.label}>Day Range:</Text>
+        <Text style={styles.value}>
+          {formatNumber(fundamentals.dayLow)} - {formatNumber(fundamentals.dayHigh)}
+        </Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.label}>52 Week Range:</Text>
+        <Text style={styles.value}>
+          {formatNumber(fundamentals.fiftyTwoWeekLow)} - {formatNumber(fundamentals.fiftyTwoWeekHigh)}
+        </Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.label}>Volume:</Text>
+        <Text style={styles.value}>
+          {fundamentals.averageVolume?.toLocaleString() ?? 'N/A'}
+        </Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.label}>Market Cap:</Text>
+        <Text style={styles.value}>
+          {fundamentals.marketCap?.toLocaleString() ?? 'N/A'}
+        </Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.label}>P/E Ratio:</Text>
+        <Text style={styles.value}>
+          {formatNumber(fundamentals.trailingPE)}
+        </Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.label}>Dividend Yield:</Text>
+        <Text style={styles.value}>
+          {formatNumber(fundamentals.dividendYield * 100)}%
+        </Text>
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
-    padding: SIZES.medium,
     backgroundColor: COLORS.white,
     borderRadius: SIZES.small,
+    padding: SIZES.medium,
     marginVertical: SIZES.small,
   },
   title: {
@@ -67,23 +92,27 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     marginBottom: SIZES.medium,
   },
-  grid: {
+  infoRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-  },
-  metricContainer: {
-    width: '48%',
-    marginBottom: SIZES.medium,
+    paddingVertical: SIZES.small / 2,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray2,
   },
   label: {
-    fontSize: SIZES.small,
-    color: COLORS.gray,
-    marginBottom: SIZES.xSmall,
+    fontSize: SIZES.medium,
+    color: COLORS.secondary,
   },
   value: {
     fontSize: SIZES.medium,
-    fontWeight: 'bold',
-    color: COLORS.secondary,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
+  error: {
+    color: COLORS.tertiary,
+    textAlign: 'center',
+    fontSize: SIZES.medium,
+  }
 });
+
+export default StockInfo;

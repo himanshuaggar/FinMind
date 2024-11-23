@@ -7,6 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { COLORS } from "../constants/theme";
+import { UserProvider } from "../contexts/UserContext";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -41,11 +42,7 @@ export default function RootLayout() {
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded && isFirstLaunch !== null) {
-      try {
-        await SplashScreen.hideAsync();
-      } catch (error) {
-        console.error('Error hiding splash screen:', error);
-      }
+      await SplashScreen.hideAsync();
     }
   }, [fontsLoaded, isFirstLaunch]);
 
@@ -54,65 +51,56 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+    <UserProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        <Stack
-          initialRouteName="onboarding"
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: COLORS.primary,
-            },
-            headerTintColor: "#fff",
-            headerTitleStyle: {
-              fontFamily: "Roboto-Bold",
-              fontSize: 18,
-            },
-            headerTitleAlign: "center",
-            headerShadowVisible: false,
-            contentStyle: {
-              backgroundColor: COLORS.lightWhite,
-            },
-            animation: "slide_from_right",
-          }}
-        >
-          <Stack.Screen
-            name="onboarding"
-            options={{
-              headerShown: false,
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen
-            name="(tabs)"
-            options={{
-              headerShown: false,
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen
-            name="error"
-            options={{
-              title: "Error",
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="modal"
-            options={{
-              presentation: "modal",
+        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+          <Stack
+            initialRouteName={isFirstLaunch ? "onboarding" : "(tabs)"}
+            screenOptions={{
               headerStyle: {
-                backgroundColor: COLORS.white,
+                backgroundColor: COLORS.background,
               },
-              headerTintColor: COLORS.primary,
+              headerTintColor: COLORS.textPrimary,
               headerTitleStyle: {
-                fontFamily: "Roboto-Medium",
+                fontFamily: "Roboto-Bold",
+              },
+              contentStyle: {
+                backgroundColor: COLORS.background,
               },
             }}
-          />
-        </Stack>
-      </View>
-    </GestureHandlerRootView>
+          >
+            <Stack.Screen
+              name="onboarding"
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="(tabs)"
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="modal"
+              options={{
+                presentation: "modal",
+                headerStyle: {
+                  backgroundColor: COLORS.background,
+                },
+                headerTintColor: COLORS.primary,
+                headerTitleStyle: {
+                  fontFamily: "Roboto-Medium",
+                },
+              }}
+            />
+          </Stack>
+        </View>
+      </GestureHandlerRootView>
+    </UserProvider>
   );
 }
 

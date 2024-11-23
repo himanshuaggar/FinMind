@@ -10,8 +10,13 @@ interface RiskLevel {
   recommendations: string[];
 }
 
-export default function RiskAssessment({ riskScore = 65 }) { // Risk score from 0-100
+interface RiskAssessmentProps {
+  stockData: any;
+}
+
+export default function RiskAssessment({ stockData }: RiskAssessmentProps) {
   const [currentRisk, setCurrentRisk] = useState<RiskLevel>();
+  const [riskScore, setRiskScore] = useState(0);
   const progressAnimation = useRef(new Animated.Value(0)).current;
 
   const riskLevels: RiskLevel[] = [
@@ -20,9 +25,9 @@ export default function RiskAssessment({ riskScore = 65 }) { // Risk score from 
       color: COLORS.success,
       description: "Conservative investment approach with focus on capital preservation",
       recommendations: [
-        "Consider government bonds and blue-chip stocks",
-        "Maintain higher allocation in fixed deposits",
-        "Focus on dividend-paying stocks"
+        "Consider long-term holding",
+        "Good for conservative portfolios",
+        "Monitor for major changes"
       ]
     },
     {
@@ -30,43 +35,67 @@ export default function RiskAssessment({ riskScore = 65 }) { // Risk score from 
       color: COLORS.warning,
       description: "Balanced approach with mix of growth and stability",
       recommendations: [
-        "Diversify across large and mid-cap stocks",
-        "Consider balanced mutual funds",
-        "Explore corporate bonds with good ratings"
+        "Regular portfolio rebalancing",
+        "Set stop-loss orders",
+        "Diversify holdings"
       ]
     },
     {
       level: "High Risk",
       color: COLORS.error,
-      description: "Aggressive approach focusing on growth potential",
+      description: "Aggressive approach with high volatility",
       recommendations: [
-        "Look into small-cap growth stocks",
-        "Consider sector-specific investments",
-        "Explore international market opportunities"
+        "Close monitoring required",
+        "Strict risk management",
+        "Consider position sizing"
       ]
     }
   ];
 
   useEffect(() => {
-    // Determine risk level based on score
-    if (riskScore <= 33) {
+    calculateRiskScore();
+  }, [stockData]);
+
+  const calculateRiskScore = () => {
+    // Calculate risk score based on various factors
+    const volatility = stockData.volatility || 0;
+    const beta = stockData.beta || 1;
+    const marketCap = stockData.marketCap || 0;
+    
+    let score = 0;
+    
+    // Volatility factor (0-40 points)
+    score += Math.min(volatility * 20, 40);
+    
+    // Beta factor (0-30 points)
+    score += Math.min(beta * 15, 30);
+    
+    // Market cap factor (0-30 points)
+    const marketCapScore = marketCap < 2000000000 ? 30 :
+                          marketCap < 10000000000 ? 20 : 10;
+    score += marketCapScore;
+    
+    setRiskScore(score);
+    
+    // Determine risk level
+    if (score <= 33) {
       setCurrentRisk(riskLevels[0]);
-    } else if (riskScore <= 66) {
+    } else if (score <= 66) {
       setCurrentRisk(riskLevels[1]);
     } else {
       setCurrentRisk(riskLevels[2]);
     }
 
-    // Animate risk meter
+    // Animate the risk meter
     Animated.timing(progressAnimation, {
-      toValue: riskScore,
-      duration: 1500,
+      toValue: score / 100,
+      duration: 1000,
       useNativeDriver: false,
     }).start();
-  }, [riskScore]);
+  };
 
-  const progressInterpolate = progressAnimation.interpolate({
-    inputRange: [0, 100],
+  const rotateData = progressAnimation.interpolate({
+    inputRange: [0, 1],
     outputRange: ['0deg', '180deg'],
   });
 
@@ -74,50 +103,39 @@ export default function RiskAssessment({ riskScore = 65 }) { // Risk score from 
     <View style={styles.container}>
       <Text style={styles.title}>Risk Assessment</Text>
       
-      {/* Risk Meter */}
-      <View style={styles.riskMeter}>
-        <View style={styles.meterContainer}>
-          <View style={styles.meterBackground}>
-            <Animated.View
-              style={[
-                styles.meterFill,
-                {
-                  transform: [{ rotate: progressInterpolate }],
-                  backgroundColor: currentRisk?.color,
-                },
-              ]}
-            />
-          </View>
-          <View style={styles.meterCenter}>
-            <Text style={styles.riskScore}>{riskScore}%</Text>
+      <View style={styles.meterContainer}>
+        <View style={styles.meter}>
+          <Animated.View
+            style={[
+              styles.meterFill,
+              {
+                backgroundColor: currentRisk?.color,
+                transform: [{ rotate: rotateData }],
+              },
+            ]}
+          />
+          <View style={[styles.meterCenter, { bottom: 0 }]}>
+            <Text style={styles.riskScore}>{Math.round(riskScore)}%</Text>
             <Text style={styles.riskLevel}>{currentRisk?.level}</Text>
           </View>
         </View>
-
-        {/* Risk Description */}
-        <View style={styles.riskDescription}>
-          <Text style={styles.descriptionText}>
-            {currentRisk?.description}
-          </Text>
-        </View>
       </View>
 
-      {/* Recommendations */}
+      <View style={styles.riskDescription}>
+        <Text style={styles.descriptionText}>{currentRisk?.description}</Text>
+      </View>
+
       <View style={styles.recommendationsContainer}>
-        <Text style={styles.recommendationTitle}>
-          Personalized Recommendations
-        </Text>
+        <Text style={styles.recommendationTitle}>Recommendations</Text>
         {currentRisk?.recommendations.map((recommendation, index) => (
           <View key={index} style={styles.recommendationItem}>
-            <FontAwesome5 
-              name="check-circle" 
-              size={16} 
-              color={currentRisk.color} 
+            <FontAwesome5
+              name="check-circle"
+              size={16}
+              color={currentRisk.color}
               style={styles.recommendationIcon}
             />
-            <Text style={styles.recommendationText}>
-              {recommendation}
-            </Text>
+            <Text style={styles.recommendationText}>{recommendation}</Text>
           </View>
         ))}
       </View>
@@ -130,8 +148,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
     borderRadius: SIZES.medium,
     padding: SIZES.medium,
-    marginHorizontal: SIZES.medium,
-    marginTop: SIZES.medium,
+    marginBottom: SIZES.medium,
   },
   title: {
     fontSize: SIZES.large,
@@ -139,25 +156,18 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: SIZES.medium,
   },
-  riskMeter: {
-    alignItems: "center",
-    marginBottom: SIZES.medium,
-  },
   meterContainer: {
-    width: 200,
-    height: 100,
     alignItems: "center",
-    justifyContent: "center",
     marginBottom: SIZES.medium,
   },
-  meterBackground: {
+  meter: {
     width: 200,
     height: 100,
     borderTopLeftRadius: 100,
     borderTopRightRadius: 100,
     backgroundColor: `${COLORS.gray}20`,
     overflow: "hidden",
-    position: "absolute",
+    position: "relative",
   },
   meterFill: {
     width: 200,

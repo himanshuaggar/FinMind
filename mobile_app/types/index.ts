@@ -66,3 +66,59 @@ export interface ReportAnalysisResult {
         page: number;
     }[];
 }
+
+export interface Portfolio {
+    totalValue: number;
+    todayGain: number;
+    totalGain: number;
+    holdings: {
+        symbol: string;
+        shares: number;
+        avgPrice: number;
+        currentPrice: number;
+        previousClose?: number;
+    }[];
+    historicalData: {
+        date: string;
+        value: number;
+    }[];
+}
+
+export interface WatchlistItem {
+    symbol: string;
+    name: string;
+    price?: number;
+    change?: number;
+    addedAt?: string;
+    lastUpdated?: string;
+}
+
+export interface Goal {
+    id: string;
+    name: string;
+    target: number;
+    current: number;
+    deadline?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface MarketSentiment {
+    overall: number;
+    bullish: number;
+    bearish: number;
+    indicators: {
+        name: string;
+        value: number;
+        signal: 'bullish' | 'bearish' | 'neutral';
+    }[];
+    lastUpdated: string;
+}
+
+export interface MarketQuote {
+    symbol: string;
+    price: number;
+    previousClose: number;
+    change: number;
+    changePercent: number;
+}

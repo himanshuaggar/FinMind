@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { useEffect, useRef } from 'react';
 import { COLORS, SIZES } from '../../constants/theme';
 
 interface ChatMessageProps {
@@ -8,15 +9,46 @@ interface ChatMessageProps {
 }
 
 export default function ChatMessage({ message, isUser, timestamp }: ChatMessageProps) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   return (
-    <View style={[styles.container, isUser ? styles.userContainer : styles.botContainer]}>
+    <Animated.View
+      style={[
+        styles.container,
+        isUser ? styles.userContainer : styles.botContainer,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
       <Text style={[styles.message, isUser ? styles.userMessage : styles.botMessage]}>
         {message}
       </Text>
       <Text style={styles.timestamp}>
-        {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        {new Date(timestamp).toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })}
       </Text>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -33,7 +65,7 @@ const styles = StyleSheet.create({
   },
   botContainer: {
     alignSelf: 'flex-start',
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.cardBackground,
   },
   message: {
     fontSize: SIZES.medium,
@@ -42,12 +74,12 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   botMessage: {
-    color: COLORS.white,
+    color: COLORS.textPrimary,
   },
   timestamp: {
-    fontSize: SIZES.small,
-    color: COLORS.lightWhite,
+    fontSize: SIZES.xSmall,
+    color: COLORS.textSecondary,
+    marginTop: SIZES.xSmall,
     alignSelf: 'flex-end',
-    marginTop: SIZES.small,
   },
 });

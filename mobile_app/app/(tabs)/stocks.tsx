@@ -28,7 +28,7 @@ export default function Stocks() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView >
+      <ScrollView>
         <StockSearch onSearch={handleSearch} loading={loading} />
 
         {error ? (
@@ -37,13 +37,17 @@ export default function Stocks() {
 
         {stockData && (
           <View style={styles.content}>
-            <StockChart
-              data={{
-                dates: stockData.historical_data.map(d => d.date),
-                prices: stockData.historical_data.map(d => d.close),
-              }}
-              symbol={stockData.symbol}
-            />
+            {Array.isArray(stockData.historical_data) ? (
+              <StockChart
+                data={{
+                  dates: stockData.historical_data.map(d => d.date),
+                  prices: stockData.historical_data.map(d => d.close),
+                }}
+                symbol={stockData.symbol}
+              />
+            ) : (
+              <Text style={styles.error}>No historical data available.</Text>
+            )}
             <StockInfo fundamentals={stockData.fundamentals} />
             <RiskAssessment stockData={stockData} />
 

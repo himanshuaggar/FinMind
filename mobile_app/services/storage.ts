@@ -1,23 +1,29 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Portfolio, WatchlistItem, Goal, MarketSentiment } from '../types';
+
+const STORAGE_KEYS = {
+  PORTFOLIO: 'portfolio',
+  WATCHLIST: 'watchlist',
+  GOALS: 'goals',
+  MARKET_SENTIMENT: 'market_sentiment',
+};
 
 export const storage = {
-  async set(key: string, value: any): Promise<void> {
+  async get<T>(key: string): Promise<T | null> {
     try {
-      const jsonValue = JSON.stringify(value);
-      await AsyncStorage.setItem(key, jsonValue);
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Error storing data:', error);
-      throw error;
+      console.error(`Error reading ${key} from storage:`, error);
+      return null;
     }
   },
 
-  async get<T>(key: string): Promise<T | null> {
+  async set<T>(key: string, value: T): Promise<void> {
     try {
-      const jsonValue = await AsyncStorage.getItem(key);
-      return jsonValue != null ? JSON.parse(jsonValue) : null;
+      await AsyncStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-      console.error('Error retrieving data:', error);
-      throw error;
+      console.error(`Error writing ${key} to storage:`, error);
     }
   },
 
@@ -25,17 +31,7 @@ export const storage = {
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.error('Error removing data:', error);
-      throw error;
-    }
-  },
-
-  async clear(): Promise<void> {
-    try {
-      await AsyncStorage.clear();
-    } catch (error) {
-      console.error('Error clearing storage:', error);
-      throw error;
+      console.error(`Error removing ${key} from storage:`, error);
     }
   },
 };

@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import Input from '../common/Input';
-import Button from '../common/Button';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
 
 interface StockSearchProps {
   onSearch: (symbol: string) => void;
-  loading?: boolean;
+  loading: boolean;
 }
 
 export default function StockSearch({ onSearch, loading }: StockSearchProps) {
@@ -20,18 +19,30 @@ export default function StockSearch({ onSearch, loading }: StockSearchProps) {
 
   return (
     <View style={styles.container}>
-      <Input
-        value={symbol}
-        onChangeText={setSymbol}
-        placeholder="Enter stock symbol (e.g., RELIANCE.NS)"
-        autoCapitalize="characters"
-      />
-      <Button
-        title="Search"
-        onPress={handleSearch}
-        loading={loading}
-        disabled={!symbol.trim()}
-      />
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.input}
+          value={symbol}
+          onChangeText={setSymbol}
+          placeholder="Enter stock symbol..."
+          placeholderTextColor={COLORS.textSecondary}
+          autoCapitalize="characters"
+        />
+        <TouchableOpacity 
+          style={styles.searchButton} 
+          onPress={handleSearch}
+          disabled={loading}
+        >
+          <FontAwesome5 
+            name="search" 
+            size={20} 
+            color={COLORS.white} 
+          />
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.hint}>
+        Example: AAPL, GOOGL, MSFT
+      </Text>
     </View>
   );
 }
@@ -39,8 +50,29 @@ export default function StockSearch({ onSearch, loading }: StockSearchProps) {
 const styles = StyleSheet.create({
   container: {
     padding: SIZES.medium,
-    backgroundColor: COLORS.white,
-    borderRadius: SIZES.small,
-    gap: SIZES.small,
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: SIZES.small,
+    paddingHorizontal: SIZES.medium,
+    paddingVertical: SIZES.small,
+    color: COLORS.textPrimary,
+    fontSize: SIZES.medium,
+    marginRight: SIZES.small,
+  },
+  searchButton: {
+    backgroundColor: COLORS.primary,
+    padding: SIZES.medium,
+    borderRadius: SIZES.small,
+  },
+  hint: {
+    color: COLORS.textSecondary,
+    fontSize: SIZES.small,
+    marginTop: SIZES.xSmall,
+  }
 });

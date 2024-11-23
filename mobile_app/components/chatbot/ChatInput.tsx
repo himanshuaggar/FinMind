@@ -1,18 +1,24 @@
 import { useState } from 'react';
-import { View, TextInput, StyleSheet } from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import { 
+  View, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  ActivityIndicator 
+} from 'react-native';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
-  disabled?: boolean;
+  disabled: boolean;
 }
 
 export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [message, setMessage] = useState('');
 
   const handleSend = () => {
-    if (message.trim()) {
+    if (message.trim() && !disabled) {
       onSend(message.trim());
       setMessage('');
     }
@@ -24,17 +30,23 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         style={styles.input}
         value={message}
         onChangeText={setMessage}
-        placeholder="Type your message..."
+        placeholder="Ask me anything about your finances..."
+        placeholderTextColor={COLORS.textSecondary}
         multiline
-        disabled={disabled}
+        maxLength={500}
+        editable={!disabled}
       />
-      <FontAwesome
-        name="send"
-        size={24}
-        color={COLORS.primary}
+      <TouchableOpacity 
+        style={[styles.sendButton, disabled && styles.disabledButton]} 
         onPress={handleSend}
-        style={[styles.sendButton, disabled && styles.disabled]}
-      />
+        disabled={disabled || !message.trim()}
+      >
+        {disabled ? (
+          <ActivityIndicator color={COLORS.white} size="small" />
+        ) : (
+          <FontAwesome5 name="paper-plane" size={20} color={COLORS.white} />
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -42,23 +54,29 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    padding: SIZES.small,
+    padding: SIZES.medium,
+    backgroundColor: COLORS.background,
     borderTopWidth: 1,
-    borderTopColor: COLORS.gray2,
-    backgroundColor: COLORS.white,
+    borderTopColor: COLORS.cardBackground,
   },
   input: {
     flex: 1,
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: SIZES.medium,
+    padding: SIZES.medium,
     marginRight: SIZES.small,
-    padding: SIZES.small,
-    backgroundColor: COLORS.lightWhite,
-    borderRadius: SIZES.small,
+    color: COLORS.textPrimary,
+    maxHeight: 100,
   },
   sendButton: {
-    alignSelf: 'flex-end',
-    padding: SIZES.small,
+    backgroundColor: COLORS.primary,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  disabled: {
-    opacity: 0.5,
+  disabledButton: {
+    backgroundColor: COLORS.gray,
   },
 });

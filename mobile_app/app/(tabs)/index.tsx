@@ -1,24 +1,59 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useUser } from '../../contexts/UserContext';
+import { getPortfolioData, getMarketOverview, getWatchlistData } from '../../services/api';
 import PortfolioSummary from "../../components/home/PortfolioSummary";
 import QuickActions from "../../components/home/QuickActions";
 import MarketOverview from "../../components/home/MarketOverview";
 import WatchlistPreview from "../../components/home/WatchlistPreview";
-import { COLORS, SIZES, SHADOWS } from "../../constants/theme";
+import Loading from '../../components/common/Loading';
+import { COLORS, SIZES } from "../../constants/theme";
 
 export default function Home() {
   const router = useRouter();
+  const { userId, userProfile } = useUser();
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [marketData, setMarketData] = useState(null);
+  const [watchlistData, setWatchlistData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, [userId]);
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [portfolio, market, watchlist] = await Promise.all([
+        getPortfolioData(userId),
+        getMarketOverview(),
+        getWatchlistData(userId)
+      ]);
+
+      setPortfolioData(portfolio);
+      setMarketData(market);
+      setWatchlistData(watchlist);
+    } catch (error) {
+      console.error('Error loading home data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return <Loading />;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Header Section */}
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Good Morning,</Text>
-            <Text style={styles.userName}>John Doe</Text>
+            <Text style={styles.userName}>{userProfile?.name || 'User'}</Text>
           </View>
           <TouchableOpacity onPress={() => router.push("/notifications")}>
             <View style={styles.notificationBadge}>
@@ -28,17 +63,10 @@ export default function Home() {
           </TouchableOpacity>
         </View>
 
-        {/* Portfolio Summary Card */}
-        <PortfolioSummary />
-
-        {/* Quick Actions */}
+        <PortfolioSummary data={portfolioData} />
         <QuickActions />
-
-        {/* Market Overview */}
-        <MarketOverview />
-
-        {/* Watchlist Preview */}
-        <WatchlistPreview />
+        <MarketOverview data={marketData} />
+        <WatchlistPreview data={watchlistData} />
       </ScrollView>
     </SafeAreaView>
   );
