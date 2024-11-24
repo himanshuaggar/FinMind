@@ -3,8 +3,9 @@ import {
   View, 
   TextInput, 
   TouchableOpacity, 
-  StyleSheet, 
-  ActivityIndicator 
+  StyleSheet,
+  ActivityIndicator,
+  Text 
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
@@ -12,9 +13,10 @@ import { COLORS, SIZES } from '../../constants/theme';
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled: boolean;
+  placeholder?: string;
 }
 
-export default function ChatInput({ onSend, disabled }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   const [message, setMessage] = useState('');
 
   const handleSend = () => {
@@ -26,38 +28,44 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
 
   return (
     <View style={styles.container}>
-      <TextInput
-        style={styles.input}
-        value={message}
-        onChangeText={setMessage}
-        placeholder="Ask me anything about your finances..."
-        placeholderTextColor={COLORS.textSecondary}
-        multiline
-        maxLength={500}
-        editable={!disabled}
-      />
-      <TouchableOpacity 
-        style={[styles.sendButton, disabled && styles.disabledButton]} 
-        onPress={handleSend}
-        disabled={disabled || !message.trim()}
-      >
-        {disabled ? (
-          <ActivityIndicator color={COLORS.white} size="small" />
-        ) : (
-          <FontAwesome5 name="paper-plane" size={20} color={COLORS.white} />
-        )}
-      </TouchableOpacity>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          value={message}
+          onChangeText={setMessage}
+          placeholder={placeholder || "Ask me about your finances..."}
+          placeholderTextColor={COLORS.textSecondary}
+          multiline
+          maxLength={500}
+          editable={!disabled}
+        />
+        <TouchableOpacity 
+          style={[styles.sendButton, disabled && styles.disabledButton]} 
+          onPress={handleSend}
+          disabled={disabled || !message.trim()}
+        >
+          {disabled ? (
+            <ActivityIndicator color={COLORS.white} size="small" />
+          ) : (
+            <FontAwesome5 name="paper-plane" size={20} color={COLORS.white} />
+          )}
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.hint}>Try asking about savings, investments, or financial goals</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
     padding: SIZES.medium,
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
-    borderTopColor: COLORS.cardBackground,
+    borderTopColor: COLORS.border,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   input: {
     flex: 1,
@@ -67,6 +75,7 @@ const styles = StyleSheet.create({
     marginRight: SIZES.small,
     color: COLORS.textPrimary,
     maxHeight: 100,
+    minHeight: 50,
   },
   sendButton: {
     backgroundColor: COLORS.primary,
@@ -79,4 +88,10 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: COLORS.gray,
   },
+  hint: {
+    color: COLORS.textSecondary,
+    fontSize: SIZES.small,
+    marginTop: SIZES.small,
+    textAlign: 'center',
+  }
 });

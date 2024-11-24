@@ -12,6 +12,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import UnstructuredURLLoader, PyPDFLoader
 from langchain_community.vectorstores import FAISS
 import json
+import uvicorn
 
 app = FastAPI()
 
@@ -353,3 +354,7 @@ def generate_financial_advice(metrics, data, query):
             return response.text
         except Exception as e:
             return f"Error generating advice: {str(e)}"
+
+# Add this at the end of the file
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

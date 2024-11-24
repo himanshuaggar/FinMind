@@ -8,6 +8,7 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { COLORS } from "../constants/theme";
 import { UserProvider } from "../contexts/UserContext";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -54,7 +55,7 @@ export default function RootLayout() {
     <UserProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+        <SafeAreaView style={{ flex: 1 }} onLayout={onLayoutRootView}>
           <Stack
             initialRouteName={isFirstLaunch ? "onboarding" : "(tabs)"}
             screenOptions={{
@@ -98,7 +99,7 @@ export default function RootLayout() {
               }}
             />
           </Stack>
-        </View>
+        </SafeAreaView>
       </GestureHandlerRootView>
     </UserProvider>
   );

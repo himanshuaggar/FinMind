@@ -4,9 +4,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import FinancialDataForm from '../../components/chatbot/FinancialDataForm';
 import ChatInput from '../../components/chatbot/ChatInput';
 import ChatMessage from '../../components/chatbot/ChatMessage';
-import GoalsTracker from '../../components/chatbot/GoalsTracker';
-import { chatWithAdvisor, analyzeStock, analyzeNews, FinancialData } from '../../services/api';
+import FinancialMetrics from '../../components/chatbot/FinancialMetrics';
+import { chatWithAdvisor } from '../../services/api';
 import { COLORS, SIZES } from '../../constants/theme';
+import { FinancialData } from '../../types';
+import Button from '../../components/common/Button';
 
 interface Message {
   id: string;
@@ -19,6 +21,7 @@ export default function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -29,11 +32,13 @@ export default function Chatbot() {
   const addWelcomeMessage = () => {
     const welcomeMessage: Message = {
       id: 'welcome',
-      text: "Hello! I'm your AI Financial Advisor. I can help you with:\n\n" +
-           "• Financial planning and advice\n" +
-           "• Stock analysis (just type 'analyze SYMBOL')\n" +
-           "• News analysis (share news URLs)\n" +
-           "• Goal tracking and recommendations\n\n" +
+      text: "Hello! I'm your AI Financial Advisor. To get started:\n\n" +
+           "1. Enter your financial information using the 'Update Financial Data' button\n" +
+           "2. Ask me questions about:\n" +
+           "   • Budgeting and savings\n" +
+           "   • Investment advice\n" +
+           "   • Debt management\n" +
+           "   • Financial goal planning\n\n" +
            "How can I assist you today?",
       isUser: false,
       timestamp: new Date()
@@ -56,17 +61,27 @@ export default function Chatbot() {
     try {
       await AsyncStorage.setItem('financialData', JSON.stringify(data));
       setFinancialData(data);
+      setShowForm(false);
+      
+      // Add confirmation message
+      const confirmMessage: Message = {
+        id: Date.now().toString(),
+        text: "Financial data updated successfully! You can now ask me questions about your finances.",
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, confirmMessage]);
     } catch (error) {
       console.error('Error saving financial data:', error);
     }
   };
 
-  const handleSendMessage = async (text: string) => {
+  const generateFinancialAdvice = async (query: string) => {
     if (!financialData) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text,
+      text: query,
       isUser: true,
       timestamp: new Date()
     };
@@ -75,42 +90,25 @@ export default function Chatbot() {
     setLoading(true);
 
     try {
-      let response;
+      const response = await chatWithAdvisor(financialData, query);
       
-      // Check if it's a stock analysis request
-      if (text.toLowerCase().startsWith('analyze ')) {
-        const symbol = text.split(' ')[1];
-        response = await analyzeStock(symbol);
-      }
-      // Check if it's a news analysis request (contains URLs)
-      else if (text.includes('http')) {
-        const urls = text.match(/(https?:\/\/[^\s]+)/g) || [];
-        const query = text.replace(/(https?:\/\/[^\s]+)/g, '').trim();
-        response = await analyzeNews(urls, query);
-      }
-      // Regular financial advice
-      else {
-        response = await chatWithAdvisor(financialData, text);
-      }
-
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: response.result || response.response || response,
+        text: response,
         isUser: false,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, botMessage]);
       
-      // Scroll to bottom
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error generating advice:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "I apologize, but I encountered an error processing your request. Please try again.",
+        text: "I apologize, but I encountered an error. Please try again.",
         isUser: false,
         timestamp: new Date()
       };
@@ -120,30 +118,50 @@ export default function Chatbot() {
     }
   };
 
-  if (!financialData) {
-    return <FinancialDataForm onSubmit={handleFinancialDataSubmit} />;
-  }
-
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        ref={scrollViewRef}
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <GoalsTracker goals={financialData.goals} />
-        <View style={styles.messagesContainer}>
-          {messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              message={message.text}
-              isUser={message.isUser}
-              timestamp={message.timestamp}
+      {showForm ? (
+        <FinancialDataForm 
+          onSubmit={handleFinancialDataSubmit}
+          initialData={financialData || undefined}
+        />
+      ) : (
+        <>
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.scrollContainer}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {financialData && <FinancialMetrics financialData={financialData} />}
+            <View style={styles.messagesContainer}>
+              {messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message.text}
+                  isUser={message.isUser}
+                  timestamp={message.timestamp}
+                />
+              ))}
+            </View>
+          </ScrollView>
+          <View style={styles.inputContainer}>
+            <Button
+              title="Update Financial Data"
+              onPress={() => setShowForm(true)}
+              type="secondary"
+              style={styles.updateButton}
             />
-          ))}
-        </View>
-      </ScrollView>
-      <ChatInput onSend={handleSendMessage} disabled={loading} />
+            <ChatInput 
+              onSend={generateFinancialAdvice} 
+              disabled={loading || !financialData}
+              placeholder={financialData ? 
+                "Ask about your finances..." : 
+                "Please update your financial data first"
+              }
+            />
+          </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -157,10 +175,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: SIZES.medium,
     paddingBottom: SIZES.xxLarge,
   },
   messagesContainer: {
     flex: 1,
+    padding: SIZES.medium,
   },
+  inputContainer: {
+    padding: SIZES.medium,
+    backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  updateButton: {
+    marginBottom: SIZES.small,
+  }
 });
