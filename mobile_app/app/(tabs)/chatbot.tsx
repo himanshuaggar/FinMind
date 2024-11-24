@@ -182,10 +182,9 @@ const styles = StyleSheet.create({
     padding: SIZES.medium,
   },
   inputContainer: {
-    padding: SIZES.medium,
+    padding: SIZES.xSmall,
     backgroundColor: COLORS.background,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    paddingBottom:0,
   },
   updateButton: {
     marginBottom: SIZES.small,

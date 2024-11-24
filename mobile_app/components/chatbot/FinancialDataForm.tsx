@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Text } from 'react-native';
+import { View, ScrollView, StyleSheet, Text, Dimensions } from 'react-native';
 import Input from '../common/Input';
 import Button from '../common/Button';
 import { COLORS, SIZES } from '../../constants/theme';
@@ -150,6 +150,7 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
           <Input
             label="Add a financial goal"
             value={newGoal}
+            style={{ width:'100%', minWidth:Dimensions.get('window').width-100 }}
             onChangeText={setNewGoal}
             onSubmitEditing={handleAddGoal}
           />
@@ -166,12 +167,12 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
           </View>
         ))}
       </View>
-
+      <View style={styles.submitButtonContainer}>
       <Button 
         title="Save Financial Data" 
         onPress={() => onSubmit(financialData)}
-        style={styles.submitButton}
       />
+      </View>
     </ScrollView>
   );
 }
@@ -181,6 +182,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: SIZES.medium,
     backgroundColor: COLORS.background,
+    paddingBottom:SIZES.xxLarge,
   },
   title: {
     fontSize: SIZES.xLarge,
@@ -201,7 +203,9 @@ const styles = StyleSheet.create({
   goalInput: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent:'space-between',
     marginBottom: SIZES.small,
+    width:'100%',
   },
   goalItem: {
     flexDirection: 'row',
@@ -216,8 +220,9 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.textPrimary,
     marginRight: SIZES.small,
+    width:'100%',
   },
-  submitButton: {
-    marginVertical: SIZES.large,
+  submitButtonContainer: {
+    marginBottom:SIZES.xxLarge,
   }
 });

@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: SIZES.small,
-    color: COLORS.secondary,
+    color: COLORS.textPrimary,
     marginBottom: SIZES.xSmall,
   },
   input: {

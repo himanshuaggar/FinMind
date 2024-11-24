@@ -37,7 +37,7 @@ export default function Button({
 
 const styles = StyleSheet.create({
   button: {
-    padding: SIZES.medium,
+    padding: SIZES.small,
     borderRadius: SIZES.small,
     alignItems: 'center',
     justifyContent: 'center',

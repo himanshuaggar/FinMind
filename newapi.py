@@ -13,6 +13,8 @@ from langchain_community.document_loaders import UnstructuredURLLoader, PyPDFLoa
 from langchain_community.vectorstores import FAISS
 import json
 import uvicorn
+import logging
+from fastapi.logger import logger
 
 app = FastAPI()
 
@@ -60,6 +62,24 @@ class ChatRequest(BaseModel):
 
 class StockRequest(BaseModel):
     symbol: str
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger.setLevel(logging.INFO)
+
+# Add this after your FastAPI app initialization
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting up FastAPI application")
+    
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Shutting down FastAPI application")
+
+# Add a health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 # API endpoints for Finance AI Analyst
 @app.post("/api/analyze-news")
@@ -355,6 +375,12 @@ def generate_financial_advice(metrics, data, query):
         except Exception as e:
             return f"Error generating advice: {str(e)}"
 
-# Add this at the end of the file
+# Update the main block to use environment port
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(
+        "newapi:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False  # Set to False for production
+    )
