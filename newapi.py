@@ -16,6 +16,7 @@ import uvicorn
 import logging
 from fastapi.logger import logger
 from fastapi.responses import JSONResponse
+from langchain.prompts import PromptTemplate
 
 app = FastAPI()
 
@@ -98,59 +99,89 @@ async def analyze_news(request: NewsRequest):
             raise HTTPException(status_code=400, detail="No URLs provided")
 
         # Add validation for URLs
-        for url in request.urls:
-            if not url.startswith(('http://', 'https://')):
-                raise HTTPException(status_code=400, detail=f"Invalid URL format: {url}")
+        valid_urls = [url for url in request.urls if url and url.startswith(('http://', 'https://'))]
+        if not valid_urls:
+            raise HTTPException(status_code=400, detail="No valid URLs provided")
 
         # Process news articles with error handling
         try:
-            loader = UnstructuredURLLoader(urls=request.urls)
-            documents = loader.load()
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error loading URLs: {str(e)}")
-
-        if not documents:
-            raise HTTPException(status_code=400, detail="No content could be extracted from the provided URLs")
+            # Initialize documents list
+            documents = []
+            loader = UnstructuredURLLoader(urls=valid_urls)
+            documents.extend(loader.load())
             
-        # Split documents
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,  # Reduced chunk size
-            chunk_overlap=50,
-            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],
-        )
-        docs = text_splitter.split_documents(documents)
-        
-        # Create embeddings with error handling
-        try:
+            if not documents:
+                raise HTTPException(status_code=400, detail="No content could be extracted from the provided URLs")
+            
+            # Split documents
+            text_splitter = RecursiveCharacterTextSplitter(
+                separators=['\n\n', '\n', '.', ','],  # Updated separators
+                chunk_size=1000,  # Increased chunk size
+                chunk_overlap=100
+            )
+            docs = text_splitter.split_documents(documents)
+            
+            # Create embeddings with error handling
             embeddings = GoogleGenerativeAIEmbeddings(
                 model="models/embedding-001",
-                google_api_key=GOOGLE_API_KEY,
-                task_type="retrieval_query"
+                google_api_key=GOOGLE_API_KEY
             )
             vectorstore = FAISS.from_documents(docs, embeddings)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error creating embeddings: {str(e)}")
-        
-        if request.query:
-            try:
+            
+            if request.query:
+                # News analysis prompt template (matching app.py)
+                news_template = """You are a financial news analyst. Analyze the provided news articles and answer the question.
+                Focus on extracting key information, trends, and implications from the news.
+                
+                Consider:
+                - Key facts and figures
+                - Market impact
+                - Industry implications
+                - Related trends
+                - Future outlook
+                
+                Context: {context}
+                Question: {question}
+                
+                Provide a clear and concise analysis structured as follows:
+                1. Key Points
+                2. Analysis
+                3. Implications
+                4. Related Context"""
+                
+                news_prompt = PromptTemplate(
+                    template=news_template,
+                    input_variables=["context", "question"]
+                )
+                
                 chain = RetrievalQA.from_chain_type(
                     llm=llm,
                     chain_type="stuff",
-                    retriever=vectorstore.as_retriever(
-                        search_kwargs={"k": 3}  # Limit to top 3 most relevant chunks
-                    ),
-                    return_source_documents=True
+                    retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
+                    return_source_documents=True,
+                    chain_type_kwargs={"prompt": news_prompt}
                 )
-                result = chain.invoke({"query": request.query})  # Use invoke instead of __call__
+                
+                result = chain.invoke({"query": request.query})
+                
+                # Format response
                 return {
                     "result": result["result"],
-                    "sources": [doc.metadata for doc in result["source_documents"]]
+                    "sources": [
+                        {
+                            "source": doc.metadata.get("source", ""),
+                            "content": doc.page_content[:200] + "..."  # First 200 chars of content
+                        } 
+                        for doc in result["source_documents"]
+                    ]
                 }
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
 
-        return {"status": "News articles processed successfully"}
-    
+            return {"status": "News articles processed successfully"}
+            
+        except Exception as e:
+            logger.error(f"Error processing news: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error processing news: {str(e)}")
+
     except HTTPException as he:
         raise he
     except Exception as e:
