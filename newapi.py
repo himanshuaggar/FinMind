@@ -15,13 +15,21 @@ import json
 import uvicorn
 import logging
 from fastapi.logger import logger
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
-# Enable CORS
+# Update CORS settings
+origins = [
+    "http://localhost:3000",     # React local development
+    "http://localhost:8000",     # FastAPI local development
+    "https://your-frontend-domain.com",  # Your deployed frontend URL
+    "*"  # During development - remove in production
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,7 +48,8 @@ genai.configure(api_key=GOOGLE_API_KEY)
 llm = ChatGoogleGenerativeAI(
     model="gemini-pro",
     temperature=0.7,
-    google_api_key=GOOGLE_API_KEY
+    google_api_key=GOOGLE_API_KEY,
+    convert_system_message_to_human=True
 )
 
 # Pydantic models for request/response
@@ -88,35 +97,65 @@ async def analyze_news(request: NewsRequest):
         if not request.urls:
             raise HTTPException(status_code=400, detail="No URLs provided")
 
-        # Process news articles
-        loader = UnstructuredURLLoader(urls=request.urls)
-        documents = loader.load()
-        
+        # Add validation for URLs
+        for url in request.urls:
+            if not url.startswith(('http://', 'https://')):
+                raise HTTPException(status_code=400, detail=f"Invalid URL format: {url}")
+
+        # Process news articles with error handling
+        try:
+            loader = UnstructuredURLLoader(urls=request.urls)
+            documents = loader.load()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error loading URLs: {str(e)}")
+
+        if not documents:
+            raise HTTPException(status_code=400, detail="No content could be extracted from the provided URLs")
+            
         # Split documents
         text_splitter = RecursiveCharacterTextSplitter(
-            separators=['\n\n', '\n', '.', ','],
-            chunk_size=1000
+            chunk_size=500,  # Reduced chunk size
+            chunk_overlap=50,
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],
         )
         docs = text_splitter.split_documents(documents)
         
-        # Create embeddings
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        vectorstore = FAISS.from_documents(docs, embeddings)
+        # Create embeddings with error handling
+        try:
+            embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/embedding-001",
+                google_api_key=GOOGLE_API_KEY,
+                task_type="retrieval_query"
+            )
+            vectorstore = FAISS.from_documents(docs, embeddings)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error creating embeddings: {str(e)}")
         
         if request.query:
-            chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                chain_type="stuff",
-                retriever=vectorstore.as_retriever(),
-                return_source_documents=True
-            )
-            result = chain({"query": request.query})
-            return {"result": result["result"], "sources": [doc.metadata for doc in result["source_documents"]]}
+            try:
+                chain = RetrievalQA.from_chain_type(
+                    llm=llm,
+                    chain_type="stuff",
+                    retriever=vectorstore.as_retriever(
+                        search_kwargs={"k": 3}  # Limit to top 3 most relevant chunks
+                    ),
+                    return_source_documents=True
+                )
+                result = chain.invoke({"query": request.query})  # Use invoke instead of __call__
+                return {
+                    "result": result["result"],
+                    "sources": [doc.metadata for doc in result["source_documents"]]
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
 
         return {"status": "News articles processed successfully"}
     
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in analyze_news: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/api/analyze-financial-reports")
 async def analyze_financial_reports(files: List[UploadFile] = File(...), query: Optional[str] = None):
@@ -375,12 +414,41 @@ def generate_financial_advice(metrics, data, query):
         except Exception as e:
             return f"Error generating advice: {str(e)}"
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc.detail)}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    logger.error(f"Unexpected error: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Please try again later."}
+    )
+
 # Update the main block to use environment port
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(
-        "newapi:app",
-        host="0.0.0.0",
-        port=port,
-        reload=False  # Set to False for production
-    )
+    # Check if running on Render
+    is_render = os.environ.get('IS_RENDER', False)
+    
+    if is_render:
+        # Production settings for Render
+        port = int(os.environ.get("PORT", 10000))
+        uvicorn.run(
+            "newapi:app",
+            host="0.0.0.0",
+            port=port,
+            workers=4,
+            reload=False
+        )
+    else:
+        # Local development settings
+        uvicorn.run(
+            "newapi:app",
+            host="127.0.0.1",  # localhost
+            port=8000,
+            reload=True  # Enable auto-reload for development
+        )

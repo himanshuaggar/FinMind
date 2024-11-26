@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: fintech-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python newapi.py
+    envVars:
+      - key: IS_RENDER
+        value: true
+      - key: GOOGLE_API_KEY
+        sync: false
