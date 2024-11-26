@@ -17,8 +17,19 @@ import logging
 from fastapi.logger import logger
 from fastapi.responses import JSONResponse
 from langchain.prompts import PromptTemplate
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+# Define lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting up FastAPI application")
+    yield
+    # Shutdown
+    logger.info("Shutting down FastAPI application")
+
+# Initialize FastAPI with lifespan
+app = FastAPI(lifespan=lifespan)
 
 # Update CORS settings
 origins = [
@@ -76,15 +87,6 @@ class StockRequest(BaseModel):
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger.setLevel(logging.INFO)
-
-# Add this after your FastAPI app initialization
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting up FastAPI application")
-    
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("Shutting down FastAPI application")
 
 # Add a health check endpoint
 @app.get("/health")
@@ -460,7 +462,7 @@ async def general_exception_handler(request, exc):
         content={"detail": "Internal server error. Please try again later."}
     )
 
-# Update the main block to use environment port
+# Update the main block for proper port binding
 if __name__ == "__main__":
     # Check if running on Render
     is_render = os.environ.get('IS_RENDER', False)
@@ -469,17 +471,19 @@ if __name__ == "__main__":
         # Production settings for Render
         port = int(os.environ.get("PORT", 10000))
         uvicorn.run(
-            "newapi:app",
+            app,  # Pass the app instance directly
             host="0.0.0.0",
             port=port,
-            workers=4,
-            reload=False
+            workers=1,  # Reduce workers to debug issues
+            log_level="info",
+            timeout_keep_alive=30,
+            loop="auto"
         )
     else:
         # Local development settings
         uvicorn.run(
-            "newapi:app",
-            host="127.0.0.1",  # localhost
+            app,  # Pass the app instance directly
+            host="127.0.0.1",
             port=8000,
-            reload=True  # Enable auto-reload for development
+            reload=True
         )
