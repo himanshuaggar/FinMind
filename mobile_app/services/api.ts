@@ -5,9 +5,6 @@ import { API_URL, API_ENDPOINTS, EXTERNAL_APIS } from '../constants/api';
 import { storage } from './storage';
 import { Portfolio, WatchlistItem, Goal, MarketSentiment } from '../types';
 
-// Update API_URL based on platform
-
-
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
@@ -85,12 +82,99 @@ export const analyzeFinancialReports = async (files: FormData, query?: string) =
   return response.data;
 };
 
-export const chatWithAdvisor = async (financialData: any, query: string) => {
-  const response = await api.post(API_ENDPOINTS.CHAT, { financial_data: financialData, query });
-  
-  console.log(response.data);
-  return response.data;
+export const chatWithAdvisor = async (financialData: FinancialData, query: string) => {
+  try {
+    // Calculate metrics before sending
+    const totalExpenses = Object.values(financialData.expenses).reduce((a, b) => a + b, 0);
+    const totalInvestments = Object.values(financialData.investments).reduce((a, b) => a + b, 0);
+    const totalDebts = Object.values(financialData.debts).reduce((a, b) => a + b, 0);
+    const monthlySavings = financialData.income - totalExpenses;
+
+    // Format the request data with calculated values
+    const formattedData = {
+      financial_data: {
+        income: Number(financialData.income) || 0,
+        expenses: Object.fromEntries(
+          Object.entries(financialData.expenses).map(([key, value]) => [key, Number(value) || 0])
+        ),
+        savings: Number(monthlySavings) || 0,
+        investments: Object.fromEntries(
+          Object.entries(financialData.investments).map(([key, value]) => [key, Number(value) || 0])
+        ),
+        debts: Object.fromEntries(
+          Object.entries(financialData.debts).map(([key, value]) => [key, Number(value) || 0])
+        ),
+        goals: Array.isArray(financialData.goals) ? financialData.goals : []
+      },
+      query: query.trim()
+    };
+
+    // Validate the data before sending
+    if (!isValidFinancialData(formattedData.financial_data)) {
+      throw new Error('Please ensure all financial values are valid numbers');
+    }
+
+    const response = await apiCall<{ response: string }>(
+      'post',
+      API_ENDPOINTS.CHAT,
+      formattedData
+    );
+    
+    return response.response;
+  } catch (error) {
+    console.error('Error in chatWithAdvisor:', error);
+    if (axios.isAxiosError(error) && error.response?.status === 422) {
+      throw new Error('Invalid financial data format. Please check your inputs.');
+    }
+    throw error;
+  }
 };
+
+// Helper function to validate financial data
+function isValidFinancialData(data: any): boolean {
+  // Check if income is a valid number
+  if (typeof data.income !== 'number' || isNaN(data.income)) {
+    return false;
+  }
+
+  // Check if savings is a valid number
+  if (typeof data.savings !== 'number' || isNaN(data.savings)) {
+    return false;
+  }
+
+  // Check expenses object
+  if (!isValidNumberObject(data.expenses)) {
+    return false;
+  }
+
+  // Check investments object
+  if (!isValidNumberObject(data.investments)) {
+    return false;
+  }
+
+  // Check debts object
+  if (!isValidNumberObject(data.debts)) {
+    return false;
+  }
+
+  // Check goals array
+  if (!Array.isArray(data.goals)) {
+    return false;
+  }
+
+  return true;
+}
+
+// Helper function to validate objects with number values
+function isValidNumberObject(obj: any): boolean {
+  if (typeof obj !== 'object' || obj === null) {
+    return false;
+  }
+
+  return Object.values(obj).every(
+    value => typeof value === 'number' && !isNaN(value)
+  );
+}
 
 export const analyzeStock = async (symbol: string) => {
   const response = await api.post(API_ENDPOINTS.STOCK_ANALYSIS, { symbol });
@@ -191,288 +275,6 @@ export const getMarketOverview = async () => {
       }
     };
   }
-};
-
-export const getPortfolioData = async (userId: string): Promise<Portfolio> => {
-  try {
-    // Try to get cached data first
-    const cachedData = await storage.get<Portfolio>('portfolio');
-    const cacheTime = await storage.get('portfolioTime');
-    
-    // Use cache if it's less than 5 minutes old
-    if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
-      return cachedData;
-    }
-
-    // Get stored portfolio or initialize with defaults
-    let portfolio = cachedData || {
-      totalValue: 0,
-      todayGain: 0,
-      totalGain: 0,
-      holdings: [
-        { symbol: 'RELIANCE.NS', shares: 10, avgPrice: 2500, currentPrice: 2500 },
-        { symbol: 'TCS.NS', shares: 5, avgPrice: 3500, currentPrice: 3500 },
-        { symbol: 'HDFCBANK.NS', shares: 15, avgPrice: 1600, currentPrice: 1600 }
-      ],
-      historicalData: Array.from({ length: 30 }, (_, i) => ({
-        date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString(),
-        value: 100000 + Math.random() * 10000
-      }))
-    };
-
-    // Update current prices for holdings using Yahoo Finance
-    if (portfolio.holdings.length > 0) {
-      const updatedHoldings = await Promise.all(
-        portfolio.holdings.map(async (holding) => {
-          try {
-            const response = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${holding.symbol}`, {
-              params: {
-                interval: '1d',
-                range: '1d',
-                includePrePost: false
-              }
-            });
-
-            if (!response?.data?.chart?.result?.[0]?.meta) {
-              throw new Error('Invalid response structure');
-            }
-
-            const meta = response.data.chart.result[0].meta;
-            const currentPrice = meta.regularMarketPrice || holding.currentPrice;
-            const previousClose = meta.previousClose || currentPrice;
-
-            return {
-              ...holding,
-              currentPrice,
-              previousClose
-            };
-          } catch (error) {
-            console.error(`Error updating price for ${holding.symbol}:`, error);
-            return holding;
-          }
-        })
-      );
-
-      // Calculate portfolio values
-      const previousTotal = portfolio.totalValue || 0;
-      const newTotalValue = updatedHoldings.reduce(
-        (sum, holding) => sum + (holding.shares * holding.currentPrice),
-        0
-      );
-      
-      // Calculate gains
-      const todayGain = previousTotal > 0 
-        ? ((newTotalValue - previousTotal) / previousTotal) * 100 
-        : 0;
-
-      const totalInvestment = updatedHoldings.reduce(
-        (sum, holding) => sum + (holding.shares * holding.avgPrice),
-        0
-      );
-
-      const totalGain = totalInvestment > 0 
-        ? ((newTotalValue - totalInvestment) / totalInvestment) * 100 
-        : 0;
-
-      // Update portfolio
-      portfolio = {
-        ...portfolio,
-        holdings: updatedHoldings,
-        totalValue: newTotalValue,
-        todayGain: parseFloat(todayGain.toFixed(2)),
-        totalGain: parseFloat(totalGain.toFixed(2)),
-        historicalData: [
-          ...portfolio.historicalData,
-          {
-            date: new Date().toISOString(),
-            value: newTotalValue
-          }
-        ].slice(-365) // Keep last year's data
-      };
-
-      // Cache the updated portfolio
-      await storage.set('portfolio', portfolio);
-      await storage.set('portfolioTime', Date.now().toString());
-    }
-
-    return portfolio;
-  } catch (error) {
-    console.error('Error in getPortfolioData:', error);
-    
-    // Return cached data if available
-    const cachedPortfolio = await storage.get<Portfolio>('portfolio');
-    if (cachedPortfolio) {
-      return cachedPortfolio;
-    }
-
-    // Return mock data if everything fails
-    return {
-      totalValue: 100000,
-      todayGain: 1.25,
-      totalGain: 15.75,
-      holdings: [
-        { 
-          symbol: 'RELIANCE.NS', 
-          shares: 10, 
-          avgPrice: 2500,
-          currentPrice: 2450.75
-        },
-        { 
-          symbol: 'TCS.NS', 
-          shares: 5, 
-          avgPrice: 3500,
-          currentPrice: 3580.50
-        },
-        { 
-          symbol: 'HDFCBANK.NS', 
-          shares: 15, 
-          avgPrice: 1600,
-          currentPrice: 1675.25
-        }
-      ],
-      historicalData: Array.from({ length: 30 }, (_, i) => ({
-        date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString(),
-        value: 100000 + Math.random() * 10000
-      }))
-    };
-  }
-};
-
-export const getWatchlistData = async (userId: string): Promise<WatchlistItem[]> => {
-  try {
-    // Get stored watchlist or initialize with default stocks
-    let watchlist = await storage.get<WatchlistItem[]>('watchlist');
-    
-    if (!watchlist) {
-      watchlist = [
-        { 
-          symbol: 'RELIANCE.NS',
-          name: 'Reliance Industries',
-          addedAt: new Date().toISOString()
-        },
-        { 
-          symbol: 'TCS.NS',
-          name: 'Tata Consultancy Services',
-          addedAt: new Date().toISOString()
-        },
-        { 
-          symbol: 'HDFCBANK.NS',
-          name: 'HDFC Bank',
-          addedAt: new Date().toISOString()
-        }
-      ];
-      await storage.set('watchlist', watchlist);
-    }
-
-    // Get current prices using Yahoo Finance API
-    const updatedWatchlist = await Promise.all(
-      watchlist.map(async (item) => {
-        try {
-          // Check if we have cached data that's less than 5 minutes old
-          const cacheKey = `stock_${item.symbol}`;
-          const cachedData = await storage.get(cacheKey);
-          const cacheTime = await storage.get(`${cacheKey}_time`);
-          
-          if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
-            return cachedData;
-          }
-
-          const response = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}`, {
-            params: {
-              interval: '1d',
-              range: '1d',
-              includePrePost: false
-            }
-          });
-
-          if (!response?.data?.chart?.result?.[0]?.meta) {
-            throw new Error('Invalid response structure');
-          }
-
-          const meta = response.data.chart.result[0].meta;
-          const currentPrice = meta.regularMarketPrice || 0;
-          const previousClose = meta.previousClose || currentPrice;
-          const priceChange = previousClose ? ((currentPrice - previousClose) / previousClose) * 100 : 0;
-
-          const updatedStock = {
-            ...item,
-            price: currentPrice,
-            change: parseFloat(priceChange.toFixed(2))
-          };
-
-          // Cache the stock data
-          await storage.set(cacheKey, updatedStock);
-          await storage.set(`${cacheKey}_time`, Date.now().toString());
-
-          return updatedStock;
-        } catch (error) {
-          console.error(`Error fetching data for ${item.symbol}:`, error);
-          // Try to get cached data if API call fails
-          const cachedStock = await storage.get(`stock_${item.symbol}`);
-          if (cachedStock) {
-            return cachedStock;
-          }
-          // Return item with mock data if no cache exists
-          return {
-            ...item,
-            price: item.symbol === 'RELIANCE.NS' ? 2450.75 :
-                   item.symbol === 'TCS.NS' ? 3580.50 : 1675.25,
-            change: item.symbol === 'RELIANCE.NS' ? 1.25 :
-                    item.symbol === 'TCS.NS' ? -0.45 : 0.85
-          };
-        }
-      })
-    );
-
-    // Cache the updated watchlist
-    await storage.set('watchlist', updatedWatchlist);
-    
-    return updatedWatchlist;
-  } catch (error) {
-    console.error('Error in getWatchlistData:', error);
-    
-    // Return stored data without prices if API fails
-    const storedWatchlist = await storage.get<WatchlistItem[]>('watchlist');
-    if (storedWatchlist) {
-      return storedWatchlist;
-    }
-    
-    // Return default data with mock prices if nothing is stored
-    return [
-      { 
-        symbol: 'RELIANCE.NS', 
-        name: 'Reliance Industries',
-        price: 2450.75,
-        change: 1.25
-      },
-      { 
-        symbol: 'TCS.NS', 
-        name: 'Tata Consultancy Services',
-        price: 3580.50,
-        change: -0.45
-      },
-      { 
-        symbol: 'HDFCBANK.NS', 
-        name: 'HDFC Bank',
-        price: 1675.25,
-        change: 0.85
-      }
-    ];
-  }
-};
-
-// Add a helper function to format the stock data
-const formatStockData = (yahooData: any): {
-  price: number;
-  change: number;
-} => {
-  const quote = yahooData.chart.result[0];
-  const meta = quote.meta;
-  
-  return {
-    price: meta.regularMarketPrice,
-    change: parseFloat(((meta.regularMarketPrice - meta.previousClose) / meta.previousClose * 100).toFixed(2))
-  };
 };
 
 export const getUserGoals = async (userId: string): Promise<Goal[]> => {
@@ -640,14 +442,6 @@ function determineSignal(value: number): 'bullish' | 'bearish' | 'neutral' {
   if (value < 0.4) return 'bearish';
   return 'neutral';
 }
-function calculateNewsSentiment(newsItems: any[]): number {
-  // Calculate sentiment score from news items
-  const sentimentScores = newsItems.map(item => 
-    item.overall_sentiment_score || 0.5
-  );
-  
-  return sentimentScores.reduce((a, b) => a + b, 0) / sentimentScores.length;
-}
 
 // Add helper functions for technical analysis
 function calculateSMA(prices: number[], period: number): number {
@@ -734,4 +528,537 @@ export const getStockChartData = async (symbol: string, range: '1D' | '1W' | '1M
     throw new Error('Failed to fetch chart data');
   }
 };
+
+interface SectorPerformance {
+  sector: string;
+  performance: number;
+}
+
+const YAHOO_FINANCE_API_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
+const NEWS_API_KEY = process.env.NEWS_API_KEY; 
+
+export const getAIInsights = async (userId: string) => {
+  try {
+    const [
+      marketNews,
+      sectorPerformance,
+      marketIndicators,
+      volatilityData
+    ] = await Promise.all([
+      fetchMarketNews(),
+      fetchSectorPerformance(),
+      fetchMarketIndicators(),
+      fetchVolatilityIndex()
+    ]);
+
+    const marketTrends = processSectorPerformance(sectorPerformance);
+    const topInsights = processMarketInsights(marketNews, marketIndicators, volatilityData);
+    const tradingVolume = calculateTradingVolume(marketIndicators);
+
+    return {
+      marketSummary: generateMarketSummary(marketTrends, volatilityData, marketNews),
+      tradingVolume,
+      volatilityIndex: volatilityData.value,
+      marketTrends,
+      topInsights,
+      lastUpdated: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error fetching AI insights:', error);
+    return getMockMarketData();
+  }
+};
+
+async function fetchMarketNews() {
+  try {
+    const response = await axios.get(
+      `https://newsapi.org/v2/top-headlines?category=business&language=en&apiKey=${process.env.EXPO_PUBLIC_NEWS_API_KEY}`
+    );
+    
+    if (!response.data?.articles) {
+      throw new Error('Invalid news data format');
+    }
+
+    return response.data.articles.map(article => ({
+      headline: article.title,
+      summary: article.description,
+      category: 'general',
+      url: article.url,
+      datetime: new Date(article.publishedAt).getTime()
+    }));
+  } catch (error) {
+    console.error('Error fetching market news:', error);
+    return getMockNews();
+  }
+}
+
+async function fetchSectorPerformance(): Promise<SectorPerformance[]> {
+  try {
+    // First try to get cached data
+    const cachedData = await storage.get('sectorPerformance');
+    const cacheTime = await storage.get('sectorPerformanceTime');
+    
+    if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
+      return cachedData;
+    }
+
+    // Since Alpha Vantage doesn't have a direct sector endpoint,
+    // we'll track major sector ETFs instead
+    const sectorETFs = {
+      Technology: 'XLK',
+      Financial: 'XLF',
+      Healthcare: 'XLV',
+      Consumer: 'XLY',
+      Industrial: 'XLI',
+      Energy: 'XLE',
+      Materials: 'XLB',
+      Utilities: 'XLU',
+      RealEstate: 'XLRE'
+    };
+
+    const sectorData: SectorPerformance[] = await Promise.all(
+      Object.entries(sectorETFs).map(async ([sector, symbol]) => {
+        try {
+          const response = await axios.get(
+            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`
+          );
+          console.log(`Response for ${sector}:`, JSON.stringify(response.data, null, 2));
+
+          const quote = response.data["Global Quote"];
+          if (!quote) {
+            throw new Error(`No quote data for ${sector}`);
+          }
+
+          return {
+            sector,
+            performance: parseFloat(quote['10. change percent'].replace('%', ''))
+          };
+        } catch (error) {
+          console.error(`Error fetching ${sector} performance:`, error);
+          return {
+            sector,
+            performance: generateMockPerformance()
+          };
+        }
+      })
+    );
+
+    // Cache the new data
+    await storage.set('sectorPerformance', sectorData);
+    await storage.set('sectorPerformanceTime', Date.now().toString());
+
+    return sectorData;
+  } catch (error) {
+    console.error('Error in fetchSectorPerformance:', error);
+    // Return mock sector data if everything fails
+    return [
+      { sector: 'Technology', performance: 1.8 },
+      { sector: 'Financial', performance: -0.5 },
+      { sector: 'Healthcare', performance: 0.7 },
+      { sector: 'Consumer', performance: 0.3 },
+      { sector: 'Industrial', performance: 1.2 },
+      { sector: 'Energy', performance: -0.8 },
+      { sector: 'Materials', performance: 0.4 },
+      { sector: 'Utilities', performance: -0.2 },
+      { sector: 'RealEstate', performance: 0.6 }
+    ];
+  }
+}
+
+// Helper function to generate realistic mock performance data
+function generateMockPerformance(): number {
+  // Generate a random number between -2 and 2 with two decimal places
+  return parseFloat((Math.random() * 4 - 2).toFixed(2));
+}
+
+async function fetchMarketIndicators() {
+  try {
+    const indices = ['^GSPC', '^DJI', '^IXIC']; // S&P 500, Dow Jones, NASDAQ
+    const responses = await Promise.all(
+      indices.map(symbol =>
+        axios.get(`${YAHOO_FINANCE_API_URL}/${symbol}?interval=1d&range=1d`)
+      )
+    );
+
+    const marketData = responses.map(response => {
+      const quote = response.data.chart.result[0];
+      const lastIndex = quote.timestamp.length - 1;
+      return {
+        symbol: quote.meta.symbol,
+        price: quote.indicators.quote[0].close[lastIndex],
+        volume: quote.indicators.quote[0].volume[lastIndex],
+        change: quote.indicators.quote[0].close[lastIndex] - quote.meta.previousClose,
+        changePercent: ((quote.indicators.quote[0].close[lastIndex] - quote.meta.previousClose) / quote.meta.previousClose) * 100
+      };
+    });
+
+    return {
+      marketStatus: 'open',
+      volume: marketData.reduce((sum, data) => sum + data.volume, 0),
+      indices: marketData
+    };
+  } catch (error) {
+    console.error('Error fetching market indicators:', error);
+    return getMockMarketIndicators();
+  }
+}
+
+async function fetchVolatilityIndex() {
+  const response = await axios.get(
+    `https://www.alphavantage.co/query?function=VIXCLS&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`
+  );
+  const data = response.data['Time Series (Daily)'];
+  const latestDate = Object.keys(data)[0];
+  return {
+    value: parseFloat(data[latestDate]['4. close']),
+    date: latestDate
+  };
+}
+
+function processSectorPerformance(sectorData: SectorPerformance[]) {
+  return sectorData.map(({ sector, performance }) => ({
+    direction: performance > 0 ? 'up' : performance < 0 ? 'down' : 'neutral',
+    percentage: Math.abs(performance),
+    sector,
+    analysis: generateSectorAnalysis(sector, performance)
+  }));
+}
+
+function processMarketInsights(marketNews: any[], marketIndicators: any, volatilityData: any) {
+  const insights = [];
+
+  // Process market news for insights
+  const significantNews = marketNews
+    .slice(0, 5)
+    .map(news => analyzeNewsImpact(news));
+
+  insights.push(...significantNews);
+
+  // Add volatility insight if significant
+  if (volatilityData.value > 20) {
+    insights.push({
+      category: 'Risk Alert',
+      title: 'High Market Volatility',
+      description: `VIX at ${volatilityData.value.toFixed(2)} indicates elevated market uncertainty. Consider defensive positioning.`,
+      impact: 'negative',
+      confidence: 90,
+      icon: 'chart-line'
+    });
+  }
+
+  return insights.slice(0, 3); // Return top 3 insights
+}
+
+function generateSectorAnalysis(sector: string, performance: number): string {
+  const trend = performance > 0 ? 'gaining' : 'declining';
+  const strength = Math.abs(performance) > 2 ? 'strong' : 'moderate';
+  
+  const sectorAnalysis = {
+    Technology: {
+      positive: 'driven by strong earnings and AI developments',
+      negative: 'facing pressure from valuation concerns'
+    },
+    Healthcare: {
+      positive: 'benefiting from defensive positioning',
+      negative: 'impacted by regulatory concerns'
+    },
+    Energy: {
+      positive: 'supported by rising commodity prices',
+      negative: 'affected by demand uncertainty'
+    }
+  };
+
+  const sectorInfo = sectorAnalysis[sector] || {
+    positive: 'showing positive momentum',
+    negative: 'experiencing downward pressure'
+  };
+
+  return `${sector} is ${trend} with ${strength} momentum, ${
+    performance > 0 ? sectorInfo.positive : sectorInfo.negative
+  }`;
+}
+
+function analyzeNewsImpact(news: any) {
+  const sentiment = analyzeSentiment(news.headline + ' ' + news.summary);
+  
+  return {
+    category: 'Market News',
+    title: news.headline.slice(0, 50) + '...',
+    description: news.summary.slice(0, 100) + '...',
+    impact: sentiment.score > 0 ? 'positive' : sentiment.score < 0 ? 'negative' : 'neutral',
+    confidence: Math.round(Math.abs(sentiment.score) * 100),
+    icon: getNewsIcon(news.category)
+  };
+}
+
+function analyzeSentiment(text: string) {
+  const positiveWords = ['growth', 'gain', 'positive', 'surge', 'rise'];
+  const negativeWords = ['decline', 'loss', 'negative', 'fall', 'risk'];
+  
+  const words = text.toLowerCase().split(' ');
+  const positiveCount = words.filter(word => positiveWords.includes(word)).length;
+  const negativeCount = words.filter(word => negativeWords.includes(word)).length;
+  
+  const score = (positiveCount - negativeCount) / words.length;
+  return { score };
+}
+
+function getNewsIcon(category: string): string {
+  const iconMap = {
+    earnings: 'chart-bar',
+    technology: 'microchip',
+    economy: 'university',
+    general: 'newspaper'
+  };
+  return iconMap[category] || 'info-circle';
+}
+
+function calculateTradingVolume(marketIndicators: any): number {
+  return marketIndicators.volume || 125000000;
+}
+
+function generateMarketSummary(
+  marketTrends: any[],
+  volatilityData: any,
+  marketNews: any[]
+): string {
+  const topSectors = marketTrends
+    .sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage))
+    .slice(0, 2);
+
+  const volatilityStatus = volatilityData.value > 20 ? 'elevated' : 'moderate';
+  
+  const significantNews = marketNews[0]?.headline || '';
+
+  return `Market showing ${volatilityStatus} volatility (VIX: ${volatilityData.value.toFixed(1)}). ${
+    topSectors[0].sector
+  } leads ${topSectors[0].direction === 'up' ? 'gains' : 'losses'} at ${
+    topSectors[0].percentage.toFixed(1)
+  }%. ${significantNews}`;
+}
+
+export const getLatestAnalysis = async (userId: string) => {
+  try {
+    // Check cache first
+    const cachedData = await storage.get('latest_analysis');
+    const cacheTime = await storage.get('latest_analysis_time');
+    
+    if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
+      return cachedData;
+    }
+
+    // Fetch data from Alpha Vantage
+    const response = await axios.get(EXTERNAL_APIS.ALPHA_VANTAGE, {
+      params: {
+        function: 'NEWS_SENTIMENT',
+        tickers: 'NIFTY,SENSEX',
+        apikey: process.env.ALPHA_VANTAGE_API_KEY
+      }
+    });
+
+    const analysis = {
+      alerts: generateAlerts(response.data),
+      insights: generateInsights(response.data),
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Cache the data
+    await storage.set('latest_analysis', analysis);
+    await storage.set('latest_analysis_time', Date.now().toString());
+
+    return analysis;
+  } catch (error) {
+    console.error('Error in getLatestAnalysis:', error);
+    return getMockLatestAnalysis();
+  }
+};
+
+// Helper functions
+function calculateVolatility(marketData: any): number {
+  try {
+    const changes = marketData?.[0]?.quotes?.map(
+      (quote: any) => quote.regularMarketChangePercent
+    ) || [];
+    const avg = changes.reduce((a: number, b: number) => a + b, 0) / changes.length;
+    const variance = changes.reduce((a: number, b: number) => a + Math.pow(b - avg, 2), 0) / changes.length;
+    return Math.sqrt(variance);
+  } catch (error) {
+    return 1.5; // Default moderate volatility
+  }
+}
+
+function generateAlerts(newsData: any): any[] {
+  try {
+    return (newsData?.feed || [])
+      .slice(0, 3)
+      .map((item: any) => ({
+        title: item.title,
+        description: item.summary,
+        priority: determinePriority(item.overall_sentiment_score),
+        timestamp: new Date(item.time_published).toISOString()
+      }));
+  } catch (error) {
+    return getMockAlerts();
+  }
+}
+
+function determinePriority(sentimentScore: number): string {
+  if (sentimentScore >= 0.5) return 'high';
+  if (sentimentScore >= 0) return 'medium';
+  return 'low';
+}
+
+function getMockLatestAnalysis() {
+  return {
+    alerts: getMockAlerts(),
+    insights: getMockInsights(),
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+function getMockAlerts() {
+  return [
+    {
+      title: 'Market Movement Alert',
+      description: 'Significant movement detected in technology sector',
+      priority: 'high',
+      timestamp: new Date().toISOString()
+    },
+    {
+      title: 'Economic Update',
+      description: 'RBI policy meeting scheduled next week',
+      priority: 'medium',
+      timestamp: new Date().toISOString()
+    },
+    {
+      title: 'Sector Update',
+      description: 'Banking sector showing strong momentum',
+      priority: 'low',
+      timestamp: new Date().toISOString()
+    }
+  ];
+}
+
+function getMockInsights() {
+  return [
+    {
+      category: 'Market Analysis',
+      title: 'Technology Sector Overview',
+      description: 'Tech stocks showing resilience amid market volatility',
+      icon: 'microchip',
+      timestamp: new Date().toISOString()
+    },
+    {
+      category: 'Economic Outlook',
+      title: 'GDP Growth Forecast',
+      description: 'Analysts project strong economic growth',
+      icon: 'chart-line',
+      timestamp: new Date().toISOString()
+    },
+    {
+      category: 'Sector Analysis',
+      title: 'Banking Sector Update',
+      description: 'Banking stocks lead market rally',
+      icon: 'university',
+      timestamp: new Date().toISOString()
+    }
+  ];
+}
+
+function getMockNews() {
+  return [
+    {
+      headline: 'Markets Rally on Economic Data',
+      summary: 'Stock markets show strong gains as economic indicators exceed expectations.',
+      category: 'general',
+      url: '#',
+      datetime: Date.now()
+    },
+    {
+      headline: 'Tech Sector Leads Market Gains',
+      summary: 'Technology stocks continue to drive market momentum with strong earnings reports.',
+      category: 'technology',
+      url: '#',
+      datetime: Date.now()
+    },
+    {
+      headline: 'Federal Reserve Policy Update',
+      summary: 'Fed signals continued focus on price stability while monitoring economic growth.',
+      category: 'economy',
+      url: '#',
+      datetime: Date.now()
+    }
+  ];
+}
+
+function getMockMarketData() {
+  return {
+    marketSummary: "Markets showing mixed signals with technology sector leading gains.",
+    tradingVolume: 125000000,
+    volatilityIndex: 15.7,
+    marketTrends: [
+      {
+        direction: 'up',
+        percentage: 2.3,
+        sector: 'Technology',
+        analysis: 'Strong earnings and AI developments driving growth'
+      },
+      {
+        direction: 'down',
+        percentage: 1.1,
+        sector: 'Energy',
+        analysis: 'Oil price volatility affecting sector performance'
+      }
+    ],
+    topInsights: getMockInsights(),
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+function generateInsights(newsData: any): any[] {
+  try {
+    return (newsData?.feed || [])
+      .slice(0, 3)
+      .map((item: any) => ({
+        category: 'Market Analysis',
+        title: item.title || 'Market Update',
+        description: item.summary || item.description || 'Market analysis update',
+        icon: getNewsIcon(item.category || 'general'),
+        timestamp: new Date(item.time_published || Date.now()).toISOString()
+      }));
+  } catch (error) {
+    console.error('Error generating insights:', error);
+    return getMockInsights();
+  }
+}
+
+function getMockMarketIndicators() {
+  return {
+    marketStatus: 'open',
+    volume: 125000000,
+    indices: [
+      {
+        symbol: '^GSPC',
+        price: 4185.82,
+        volume: 42000000,
+        change: 35.88,
+        changePercent: 0.85
+      },
+      {
+        symbol: '^DJI',
+        price: 32945.84,
+        volume: 38000000,
+        change: 171.32,
+        changePercent: 0.52
+      },
+      {
+        symbol: '^IXIC',
+        price: 14284.34,
+        volume: 45000000,
+        change: 181.74,
+        changePercent: 1.28
+      }
+    ]
+  };
+}
 

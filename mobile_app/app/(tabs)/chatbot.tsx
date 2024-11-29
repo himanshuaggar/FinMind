@@ -100,21 +100,22 @@ export default function Chatbot() {
       };
 
       setMessages(prev => [...prev, botMessage]);
-      
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
     } catch (error) {
       console.error('Error generating advice:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "I apologize, but I encountered an error. Please try again.",
+        text: error instanceof Error 
+          ? error.message 
+          : "I apologize, but I encountered an error. Please try again.",
         isUser: false,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setLoading(false);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
   };
 

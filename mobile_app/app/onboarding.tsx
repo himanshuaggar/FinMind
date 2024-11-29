@@ -1,120 +1,104 @@
-import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Image, Dimensions } from "react-native";
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { TouchableOpacity } from "react-native-gesture-handler";
-import Animated, { 
-  FadeInDown, 
-  FadeInUp,
-  FadeInLeft 
-} from "react-native-reanimated";
-import { COLORS, SIZES } from "../constants/theme";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  useWindowDimensions,
+  TouchableOpacity
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { COLORS, SIZES } from '../constants/theme';
+import Button from '../components/common/Button';
 
-const { width, height } = Dimensions.get('window');
-
-const features = [
+const onboardingData = [
   {
-    icon: "📊",
-    title: "Portfolio Tracking",
-    description: "Track your investments and analyze performance in real-time"
+    id: '1',
+    title: 'AI-Powered Financial Insights',
+    description: 'Get personalized financial advice and market insights powered by advanced AI.',
+    icon: 'robot'
   },
   {
-    icon: "🤖",
-    title: "AI-Powered Analysis",
-    description: "Get intelligent insights and recommendations for your investments"
+    id: '2',
+    title: 'Smart Portfolio Management',
+    description: 'Track and manage your investments with real-time updates and analytics.',
+    icon: 'chart-line'
   },
   {
-    icon: "📈",
-    title: "Market Updates",
-    description: "Stay updated with real-time market trends and news"
+    id: '3',
+    title: 'Personal Financial Advisor',
+    description: 'Chat with your AI financial advisor anytime, anywhere.',
+    icon: 'comments-dollar'
   }
 ];
 
 export default function Onboarding() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const { width } = useWindowDimensions();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    checkFirstTime();
-  }, []);
+  const renderItem = ({ item }) => (
+    <View style={[styles.slide, { width }]}>
+      <FontAwesome5 name={item.icon} size={80} color={COLORS.primary} />
+      <Text style={styles.title}>{item.title}</Text>
+      <Text style={styles.description}>{item.description}</Text>
+    </View>
+  );
 
-  const checkFirstTime = async () => {
-    try {
-      const hasLaunched = await AsyncStorage.getItem('hasLaunched');
-      if (hasLaunched !== null) {
-        router.replace("/(tabs)");
-      }
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error checking first launch:', error);
-      setIsLoading(false);
+  const handleNext = () => {
+    if (currentIndex < onboardingData.length - 1) {
+      flatListRef.current?.scrollToIndex({
+        index: currentIndex + 1,
+        animated: true
+      });
+    } else {
+      router.replace('/auth');
     }
   };
 
-  const handleGetStarted = async () => {
-    try {
-      await AsyncStorage.setItem('hasLaunched', 'true');
-      router.replace("/(tabs)");
-    } catch (error) {
-      console.error('Error setting first launch:', error);
-    }
+  const handleSkip = () => {
+    router.replace('/auth');
   };
-
-  if (isLoading) {
-    return null;
-  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Logo and Title Section */}
-      <Animated.View 
-        entering={FadeInDown.duration(1000).springify()}
-        style={styles.headerContainer}
-      >
-        <Image
-          source={require("../assets/favicon.png")}
-          style={styles.logo}
-        />
-        <Text style={styles.title}>FinAnalytiQ</Text>
-        <Text style={styles.subtitle}>
-          Your Smart Finance Assistant
-        </Text>
-      </Animated.View>
+    <View style={styles.container}>
+      <FlatList
+        ref={flatListRef}
+        data={onboardingData}
+        renderItem={renderItem}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(event) => {
+          const index = Math.round(event.nativeEvent.contentOffset.x / width);
+          setCurrentIndex(index);
+        }}
+      />
 
-      {/* Features Section */}
-      <View style={styles.featuresContainer}>
-        {features.map((feature, index) => (
-          <Animated.View
+      <View style={styles.pagination}>
+        {onboardingData.map((_, index) => (
+          <View
             key={index}
-            entering={FadeInLeft.delay(500 + index * 200).springify()}
-            style={styles.featureItem}
-          >
-            <Text style={styles.featureIcon}>{feature.icon}</Text>
-            <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>{feature.title}</Text>
-              <Text style={styles.featureDescription}>{feature.description}</Text>
-            </View>
-          </Animated.View>
+            style={[
+              styles.paginationDot,
+              index === currentIndex && styles.paginationDotActive
+            ]}
+          />
         ))}
       </View>
 
-      {/* Button Section */}
-      <Animated.View 
-        entering={FadeInUp.delay(1200).springify()}
-        style={styles.buttonContainer}
-      >
-        <TouchableOpacity 
-          style={styles.button} 
-          onPress={handleGetStarted}
-        >
-          <Text style={styles.buttonText}>Get Started</Text>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity onPress={handleSkip}>
+          <Text style={styles.skipButton}>Skip</Text>
         </TouchableOpacity>
-        <Text style={styles.disclaimer}>
-          By continuing, you agree to our Terms & Privacy Policy
-        </Text>
-      </Animated.View>
-    </SafeAreaView>
+        <Button
+          title={currentIndex === onboardingData.length - 1 ? "Get Started" : "Next"}
+          onPress={handleNext}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -122,95 +106,53 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: SIZES.medium,
   },
-  headerContainer: {
-    alignItems: "center",
-    marginTop: height * 0.1,
-  },
-  logo: {
-    width: width * 0.4,
-    height: width * 0.4,
-    resizeMode: "contain",
+  slide: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SIZES.large,
   },
   title: {
-    fontSize: SIZES.xxLarge,
-    fontWeight: "bold",
-    color: COLORS.primary,
-    marginTop: SIZES.medium,
-    fontFamily: "Roboto-Bold",
-  },
-  subtitle: {
-    fontSize: SIZES.large,
-    color: COLORS.textSecondary,
-    textAlign: "center",
-    marginTop: SIZES.small,
-    fontFamily: "Roboto-Regular",
-  },
-  featuresContainer: {
-    marginTop: height * 0.08,
-    gap: SIZES.medium,
-  },
-  featureItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.cardBackground,
-    padding: SIZES.medium,
-    borderRadius: SIZES.medium,
-    elevation: 2,
-    shadowColor: COLORS.primary,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  featureIcon: {
     fontSize: SIZES.xLarge,
-    marginRight: SIZES.medium,
-  },
-  featureTextContainer: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: SIZES.medium,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     color: COLORS.textPrimary,
-    marginBottom: SIZES.xSmall,
-    fontFamily: "Roboto-Bold",
+    textAlign: 'center',
+    marginTop: SIZES.large,
+    marginBottom: SIZES.medium,
   },
-  featureDescription: {
-    fontSize: SIZES.small,
+  description: {
+    fontSize: SIZES.medium,
     color: COLORS.textSecondary,
-    fontFamily: "Roboto-Regular",
+    textAlign: 'center',
+    paddingHorizontal: SIZES.large,
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SIZES.xxLarge,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.gray,
+    marginHorizontal: 4,
+  },
+  paginationDotActive: {
+    backgroundColor: COLORS.primary,
+    width: 20,
   },
   buttonContainer: {
-    position: "absolute",
-    bottom: height * 0.05,
-    left: SIZES.medium,
-    right: SIZES.medium,
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.large,
+    paddingBottom: SIZES.large,
   },
-  button: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SIZES.xxLarge,
-    paddingVertical: SIZES.medium,
-    borderRadius: SIZES.large,
-    width: "100%",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: COLORS.white,
-    fontSize: SIZES.large,
-    fontWeight: "bold",
-    fontFamily: "Roboto-Bold",
-  },
-  disclaimer: {
-    marginTop: SIZES.medium,
-    fontSize: SIZES.small,
+  skipButton: {
+    fontSize: SIZES.medium,
     color: COLORS.textSecondary,
-    textAlign: "center",
-    fontFamily: "Roboto-Regular",
   },
 });

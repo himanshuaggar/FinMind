@@ -13,9 +13,29 @@ declare global {
 
 export interface FinancialData {
     income: number;
-    expenses: Record<string, number>;
-    investments: Record<string, number>;
-    debts: Record<string, number>;
+    expenses: {
+        Housing: number;
+        Food: number;
+        Transportation: number;
+        Utilities: number;
+        Entertainment: number;
+        Other: number;
+    };
+    savings: number;
+    investments: {
+        Stocks: number;
+        'Mutual Funds': number;
+        'Fixed Deposits': number;
+        'Real Estate': number;
+        Other: number;
+    };
+    debts: {
+        'Home Loan': number;
+        'Car Loan': number;
+        'Personal Loan': number;
+        'Credit Card': number;
+        'Other Debts': number;
+    };
     goals: string[];
 }
 
