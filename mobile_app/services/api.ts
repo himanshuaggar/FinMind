@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, API_ENDPOINTS, EXTERNAL_APIS } from '../constants/api';
 import { storage } from './storage';
 import { Portfolio, WatchlistItem, Goal, MarketSentiment } from '../types';
+import { NEWS_CACHE_TIME } from '../constants/config';
+import { NewsItem, NewsCategory } from '../types/news';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -119,7 +121,7 @@ export const chatWithAdvisor = async (financialData: FinancialData, query: strin
       API_ENDPOINTS.CHAT,
       formattedData
     );
-    
+
     return response.response;
   } catch (error) {
     console.error('Error in chatWithAdvisor:', error);
@@ -187,7 +189,7 @@ export const getMarketOverview = async () => {
     // Try to get cached data first
     const cachedData = await storage.get('marketOverview');
     const cacheTime = await storage.get('marketOverviewTime');
-    
+
     // Use cache if it's less than 5 minutes old
     if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
       return cachedData;
@@ -218,7 +220,7 @@ export const getMarketOverview = async () => {
         const meta = response.data.chart.result[0].meta;
         const currentPrice = meta.regularMarketPrice || 0;
         const previousClose = meta.previousClose || currentPrice;
-        
+
         return {
           value: currentPrice,
           change: previousClose ? parseFloat(((currentPrice - previousClose) / previousClose * 100).toFixed(2)) : 0
@@ -302,7 +304,7 @@ export const getMarketSentiment = async (): Promise<MarketSentiment> => {
     // Try to get cached data first
     const cachedData = await storage.get<MarketSentiment>('market_sentiment');
     const cacheTime = await storage.get('market_sentiment_time');
-    
+
     // Use cache if it's less than 15 minutes old
     if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 900000) {
       return cachedData;
@@ -329,7 +331,7 @@ export const getMarketSentiment = async (): Promise<MarketSentiment> => {
 
     // Calculate sentiment from recent price movements
     const recentPrices = prices.slice(-5);
-    const priceMovement = recentPrices.length > 1 ? 
+    const priceMovement = recentPrices.length > 1 ?
       (recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentPrices[0] * 100 : 0;
 
     const bullishSignals = [
@@ -372,7 +374,7 @@ export const getMarketSentiment = async (): Promise<MarketSentiment> => {
     return sentiment;
   } catch (error) {
     console.error('Error in getMarketSentiment:', error);
-    
+
     // Return cached data if available
     const cachedSentiment = await storage.get<MarketSentiment>('market_sentiment');
     if (cachedSentiment) {
@@ -463,11 +465,11 @@ export const getStockChartData = async (symbol: string, range: '1D' | '1W' | '1M
   try {
     const formattedSymbol = symbol.endsWith('.NS') ? symbol : `${symbol}.NS`;
     const cacheKey = `chart_${formattedSymbol}_${range}`;
-    
+
     // Check cache first
     const cachedData = await storage.get(cacheKey);
     const cacheTime = await storage.get(`${cacheKey}_time`);
-    
+
     // Use cache if it's less than 5 minutes old
     if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
       return cachedData;
@@ -535,25 +537,18 @@ interface SectorPerformance {
 }
 
 const YAHOO_FINANCE_API_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
-const NEWS_API_KEY = process.env.NEWS_API_KEY; 
 
-export const getAIInsights = async (userId: string) => {
+export const getAIInsights = async () => {
   try {
-    const [
-      marketNews,
-      sectorPerformance,
-      marketIndicators,
-      volatilityData
-    ] = await Promise.all([
+    const [marketNews, sectorPerformance, volatilityData] = await Promise.all([
       fetchMarketNews(),
       fetchSectorPerformance(),
-      fetchMarketIndicators(),
       fetchVolatilityIndex()
     ]);
 
     const marketTrends = processSectorPerformance(sectorPerformance);
-    const topInsights = processMarketInsights(marketNews, marketIndicators, volatilityData);
-    const tradingVolume = calculateTradingVolume(marketIndicators);
+    const topInsights = processMarketInsights(marketNews, volatilityData);
+    const tradingVolume = calculateTradingVolume(sectorPerformance);
 
     return {
       marketSummary: generateMarketSummary(marketTrends, volatilityData, marketNews),
@@ -571,20 +566,23 @@ export const getAIInsights = async (userId: string) => {
 
 async function fetchMarketNews() {
   try {
+    // Using Yahoo Finance API for news
     const response = await axios.get(
-      `https://newsapi.org/v2/top-headlines?category=business&language=en&apiKey=${process.env.EXPO_PUBLIC_NEWS_API_KEY}`
+      'https://query1.finance.yahoo.com/v1/news/list',
+      {
+        params: {
+          region: 'US',
+          snippetCount: 5
+        }
+      }
     );
-    
-    if (!response.data?.articles) {
-      throw new Error('Invalid news data format');
-    }
 
-    return response.data.articles.map(article => ({
+    return response.data.items.map((article: any) => ({
       headline: article.title,
-      summary: article.description,
-      category: 'general',
-      url: article.url,
-      datetime: new Date(article.publishedAt).getTime()
+      summary: article.summary,
+      category: article.category || 'general',
+      url: article.link,
+      datetime: new Date(article.published_at).getTime()
     }));
   } catch (error) {
     console.error('Error fetching market news:', error);
@@ -592,136 +590,77 @@ async function fetchMarketNews() {
   }
 }
 
-async function fetchSectorPerformance(): Promise<SectorPerformance[]> {
+async function fetchSectorPerformance() {
   try {
-    // First try to get cached data
-    const cachedData = await storage.get('sectorPerformance');
-    const cacheTime = await storage.get('sectorPerformanceTime');
-    
-    if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
-      return cachedData;
-    }
-
-    // Since Alpha Vantage doesn't have a direct sector endpoint,
-    // we'll track major sector ETFs instead
-    const sectorETFs = {
-      Technology: 'XLK',
-      Financial: 'XLF',
-      Healthcare: 'XLV',
-      Consumer: 'XLY',
-      Industrial: 'XLI',
-      Energy: 'XLE',
-      Materials: 'XLB',
-      Utilities: 'XLU',
-      RealEstate: 'XLRE'
-    };
-
-    const sectorData: SectorPerformance[] = await Promise.all(
-      Object.entries(sectorETFs).map(async ([sector, symbol]) => {
-        try {
-          const response = await axios.get(
-            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`
-          );
-          console.log(`Response for ${sector}:`, JSON.stringify(response.data, null, 2));
-
-          const quote = response.data["Global Quote"];
-          if (!quote) {
-            throw new Error(`No quote data for ${sector}`);
-          }
-
-          return {
-            sector,
-            performance: parseFloat(quote['10. change percent'].replace('%', ''))
-          };
-        } catch (error) {
-          console.error(`Error fetching ${sector} performance:`, error);
-          return {
-            sector,
-            performance: generateMockPerformance()
-          };
-        }
-      })
-    );
-
-    // Cache the new data
-    await storage.set('sectorPerformance', sectorData);
-    await storage.set('sectorPerformanceTime', Date.now().toString());
-
-    return sectorData;
-  } catch (error) {
-    console.error('Error in fetchSectorPerformance:', error);
-    // Return mock sector data if everything fails
-    return [
-      { sector: 'Technology', performance: 1.8 },
-      { sector: 'Financial', performance: -0.5 },
-      { sector: 'Healthcare', performance: 0.7 },
-      { sector: 'Consumer', performance: 0.3 },
-      { sector: 'Industrial', performance: 1.2 },
-      { sector: 'Energy', performance: -0.8 },
-      { sector: 'Materials', performance: 0.4 },
-      { sector: 'Utilities', performance: -0.2 },
-      { sector: 'RealEstate', performance: 0.6 }
-    ];
-  }
-}
-
-// Helper function to generate realistic mock performance data
-function generateMockPerformance(): number {
-  // Generate a random number between -2 and 2 with two decimal places
-  return parseFloat((Math.random() * 4 - 2).toFixed(2));
-}
-
-async function fetchMarketIndicators() {
-  try {
-    const indices = ['^GSPC', '^DJI', '^IXIC']; // S&P 500, Dow Jones, NASDAQ
+    // Using Yahoo Finance API for sector performance
+    const sectors = ['^GSPC', '^DJI', '^IXIC', '^RUT', '^TNX'];
     const responses = await Promise.all(
-      indices.map(symbol =>
-        axios.get(`${YAHOO_FINANCE_API_URL}/${symbol}?interval=1d&range=1d`)
+      sectors.map(symbol =>
+        axios.get(`${YAHOO_FINANCE_API_URL}/${symbol}`, {
+          params: {
+            interval: '1d',
+            range: '1d'
+          }
+        })
       )
     );
 
-    const marketData = responses.map(response => {
-      const quote = response.data.chart.result[0];
-      const lastIndex = quote.timestamp.length - 1;
-      return {
-        symbol: quote.meta.symbol,
-        price: quote.indicators.quote[0].close[lastIndex],
-        volume: quote.indicators.quote[0].volume[lastIndex],
-        change: quote.indicators.quote[0].close[lastIndex] - quote.meta.previousClose,
-        changePercent: ((quote.indicators.quote[0].close[lastIndex] - quote.meta.previousClose) / quote.meta.previousClose) * 100
-      };
-    });
-
-    return {
-      marketStatus: 'open',
-      volume: marketData.reduce((sum, data) => sum + data.volume, 0),
-      indices: marketData
-    };
+    return responses.map((response, index) => ({
+      symbol: sectors[index],
+      data: response.data.chart.result[0]
+    }));
   } catch (error) {
-    console.error('Error fetching market indicators:', error);
-    return getMockMarketIndicators();
+    console.error('Error fetching sector performance:', error);
+    return getMockSectorPerformance();
   }
 }
 
 async function fetchVolatilityIndex() {
-  const response = await axios.get(
-    `https://www.alphavantage.co/query?function=VIXCLS&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`
-  );
-  const data = response.data['Time Series (Daily)'];
-  const latestDate = Object.keys(data)[0];
-  return {
-    value: parseFloat(data[latestDate]['4. close']),
-    date: latestDate
-  };
+  try {
+    // Using VIX index from Yahoo Finance
+    const response = await axios.get(`${YAHOO_FINANCE_API_URL}/%5EVIX`, {
+      params: {
+        interval: '1d',
+        range: '1d'
+      }
+    });
+
+    const result = response.data.chart.result[0];
+    return {
+      value: result.meta.regularMarketPrice,
+      previousClose: result.meta.previousClose
+    };
+  } catch (error) {
+    console.error('Error fetching volatility index:', error);
+    return { value: 15, previousClose: 14.5 };
+  }
 }
 
-function processSectorPerformance(sectorData: SectorPerformance[]) {
-  return sectorData.map(({ sector, performance }) => ({
-    direction: performance > 0 ? 'up' : performance < 0 ? 'down' : 'neutral',
-    percentage: Math.abs(performance),
-    sector,
-    analysis: generateSectorAnalysis(sector, performance)
-  }));
+function processSectorPerformance(sectorData: any[]): MarketTrend[] {
+  return sectorData.map(sector => {
+    const meta = sector.data.meta;
+    const currentPrice = meta.regularMarketPrice;
+    const previousClose = meta.previousClose;
+    const percentage = ((currentPrice - previousClose) / previousClose) * 100;
+
+    return {
+      direction: percentage > 0 ? 'up' : percentage < 0 ? 'down' : 'neutral',
+      percentage: Math.abs(percentage),
+      sector: getSectorName(sector.symbol),
+      analysis: generateSectorAnalysis(percentage, sector.symbol)
+    };
+  });
+}
+
+function getSectorName(symbol: string): string {
+  const sectorMap: { [key: string]: string } = {
+    '^GSPC': 'S&P 500',
+    '^DJI': 'Dow Jones',
+    '^IXIC': 'NASDAQ',
+    '^RUT': 'Russell 2000',
+    '^TNX': 'Treasury Yield'
+  };
+  return sectorMap[symbol] || symbol;
 }
 
 function processMarketInsights(marketNews: any[], marketIndicators: any, volatilityData: any) {
@@ -752,7 +691,7 @@ function processMarketInsights(marketNews: any[], marketIndicators: any, volatil
 function generateSectorAnalysis(sector: string, performance: number): string {
   const trend = performance > 0 ? 'gaining' : 'declining';
   const strength = Math.abs(performance) > 2 ? 'strong' : 'moderate';
-  
+
   const sectorAnalysis = {
     Technology: {
       positive: 'driven by strong earnings and AI developments',
@@ -773,14 +712,13 @@ function generateSectorAnalysis(sector: string, performance: number): string {
     negative: 'experiencing downward pressure'
   };
 
-  return `${sector} is ${trend} with ${strength} momentum, ${
-    performance > 0 ? sectorInfo.positive : sectorInfo.negative
-  }`;
+  return `${sector} is ${trend} with ${strength} momentum, ${performance > 0 ? sectorInfo.positive : sectorInfo.negative
+    }`;
 }
 
 function analyzeNewsImpact(news: any) {
   const sentiment = analyzeSentiment(news.headline + ' ' + news.summary);
-  
+
   return {
     category: 'Market News',
     title: news.headline.slice(0, 50) + '...',
@@ -794,11 +732,11 @@ function analyzeNewsImpact(news: any) {
 function analyzeSentiment(text: string) {
   const positiveWords = ['growth', 'gain', 'positive', 'surge', 'rise'];
   const negativeWords = ['decline', 'loss', 'negative', 'fall', 'risk'];
-  
+
   const words = text.toLowerCase().split(' ');
   const positiveCount = words.filter(word => positiveWords.includes(word)).length;
   const negativeCount = words.filter(word => negativeWords.includes(word)).length;
-  
+
   const score = (positiveCount - negativeCount) / words.length;
   return { score };
 }
@@ -827,22 +765,20 @@ function generateMarketSummary(
     .slice(0, 2);
 
   const volatilityStatus = volatilityData.value > 20 ? 'elevated' : 'moderate';
-  
+
   const significantNews = marketNews[0]?.headline || '';
 
-  return `Market showing ${volatilityStatus} volatility (VIX: ${volatilityData.value.toFixed(1)}). ${
-    topSectors[0].sector
-  } leads ${topSectors[0].direction === 'up' ? 'gains' : 'losses'} at ${
-    topSectors[0].percentage.toFixed(1)
-  }%. ${significantNews}`;
+  return `Market showing ${volatilityStatus} volatility (VIX: ${volatilityData.value.toFixed(1)}). ${topSectors[0].sector
+    } leads ${topSectors[0].direction === 'up' ? 'gains' : 'losses'} at ${topSectors[0].percentage.toFixed(1)
+    }%. ${significantNews}`;
 }
 
-export const getLatestAnalysis = async (userId: string) => {
+export const getLatestAnalysis = async () => {
   try {
     // Check cache first
     const cachedData = await storage.get('latest_analysis');
     const cacheTime = await storage.get('latest_analysis_time');
-    
+
     if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
       return cachedData;
     }
@@ -1062,3 +998,132 @@ function getMockMarketIndicators() {
   };
 }
 
+// Cache key constants
+const NEWS_CACHE_KEY = 'news_cache_';
+const NEWS_LAST_FETCH_KEY = 'news_last_fetch_';
+const API_CALL_COUNT_KEY = 'news_api_calls_';
+
+const NEWSAPI_BASE_URL = 'https://newsapi.org/v2';
+
+// Consolidated mock data functions
+const getMockData = {
+  news: (category: NewsCategory = 'all'): NewsItem[] => {
+    return [
+      {
+        id: '1',
+        title: 'Market Update: Global Markets Show Resilience',
+        description: 'Major indices demonstrate strength amid economic challenges',
+        imageUrl: 'https://example.com/market-image.jpg',
+        source: 'Financial Times',
+        url: 'https://example.com/market-update',
+        publishedAt: new Date().toISOString(),
+        category: 'business',
+        content: 'Detailed market analysis...'
+      },
+      {
+        id: '2',
+        title: 'Tech Sector Leads Market Rally',
+        description: 'Technology companies show strong performance in latest trading session',
+        imageUrl: 'https://example.com/tech-image.jpg',
+        source: 'Bloomberg',
+        url: 'https://example.com/tech-rally',
+        publishedAt: new Date().toISOString(),
+        category: 'technology',
+        content: 'Technology sector analysis...'
+      },
+      {
+        id: '3',
+        title: 'Federal Reserve Announces Policy Decision',
+        description: 'Central bank maintains current monetary policy stance',
+        imageUrl: 'https://example.com/fed-image.jpg',
+        source: 'Reuters',
+        url: 'https://example.com/fed-policy',
+        publishedAt: new Date().toISOString(),
+        category: 'business',
+        content: 'Federal Reserve policy analysis...'
+      }
+    ];
+  },
+  marketIndicators: () => {
+    return {
+      marketStatus: 'open',
+      volume: 125000000,
+      indices: [
+        {
+          symbol: '^GSPC',
+          price: 4185.82,
+          volume: 42000000,
+          change: 35.88,
+          changePercent: 0.85
+        },
+        {
+          symbol: '^DJI',
+          price: 32945.84,
+          volume: 38000000,
+          change: 171.32,
+          changePercent: 0.52
+        },
+        {
+          symbol: '^IXIC',
+          price: 14284.34,
+          volume: 45000000,
+          change: 181.74,
+          changePercent: 1.28
+        }
+      ]
+    };
+  }
+};
+
+const NEWS_API_KEY = "25989c6cfcc8415d9a8f10121bc11e36";
+
+export const getNews = async (category: NewsCategory = 'all'): Promise<NewsItem[]> => {
+  try {
+    // Check cache first
+    // const cacheKey = `news_${category}`;
+    // const cachedData = await storage.get(cacheKey);
+    // const cacheTime = await storage.get(`${cacheKey}_time`);
+
+    // // Use cache if it's less than 15 minutes old
+    // if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 90) {
+    //   return JSON.parse(cachedData);
+    // }
+
+    let endpoint = `${NEWSAPI_BASE_URL}/top-headlines`;
+    let params: any = {
+      country: 'us',
+      apiKey: NEWS_API_KEY,
+      category:'business'
+    };
+
+    // if (category !== 'all') {
+    //   params.category = category;
+    // }
+    console.log(endpoint)
+    console.log(params)
+
+    const response = await axios.get(endpoint, { params });
+    console.log(response)
+
+    const newsItems = response.data.articles.map((article: any, index: number) => ({
+      id: `${article.publishedAt}-${index}`,
+      title: article.title,
+      description: article.description,
+      imageUrl: article.urlToImage,
+      source: article.source.name,
+      url: article.url,
+      publishedAt: article.publishedAt,
+      category: category,
+      content: article.content
+    }));
+
+    // // Cache the data
+    // await storage.set(cacheKey, JSON.stringify(newsItems));
+    // await storage.set(`${cacheKey}_time`, Date.now().toString());
+
+    return newsItems;
+  } catch (error) {
+    console.error('Error fetching news:', error);
+    return getMockData.news(category);
+  }
+};

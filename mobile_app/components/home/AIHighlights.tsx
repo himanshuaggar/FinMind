@@ -31,10 +31,9 @@ interface MarketData {
 
 interface AIHighlightsProps {
   onPress: () => void;
-  userId: string;
 }
 
-export default function AIHighlights({ onPress, userId }: AIHighlightsProps) {
+export default function AIHighlights({ onPress }: AIHighlightsProps) {
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +43,7 @@ export default function AIHighlights({ onPress, userId }: AIHighlightsProps) {
     try {
       setLoading(true);
       setError(null);
-      const marketData = await getAIInsights(userId);
+      const marketData = await getAIInsights();
       setData(marketData);
     } catch (err) {
       setError('Failed to load market data. Please try again later.');
@@ -66,7 +65,7 @@ export default function AIHighlights({ onPress, userId }: AIHighlightsProps) {
         clearInterval(refreshInterval);
       }
     };
-  }, [userId]);
+  }, []);
 
   const getTrendIcon = (direction: string) => {
     switch (direction) {

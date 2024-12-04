@@ -3,39 +3,63 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { FontAwesome5, MaterialIcons } from "@expo/vector-icons";
-import { useUser } from '../../contexts/UserContext';
+import { useUser as useClerkUser } from "@clerk/clerk-expo";
 import { getAIInsights, getMarketOverview, getLatestAnalysis } from '../../services/api';
 import AIHighlights from "../../components/home/AIHighlights";
 import QuickActions from "../../components/home/QuickActions";
-import MarketPulse from "../../components/home/MarketPulse";
-import SmartAlerts from "../../components/home/SmartAlerts";
-import PersonalizedInsights from "../../components/home/PersonalizedInsights";
 import Loading from '../../components/common/Loading';
 import { COLORS, SIZES } from "../../constants/theme";
 import { LinearGradient } from 'expo-linear-gradient';
+import FinancialTipCard from '../../components/home/FinancialTipCard';
+import FinancialTerms from '../../components/home/FinancialTerms';
+import MarketEducation from '../../components/home/MarketEducation';
+import EconomicIndicators from '../../components/home/EconomicIndicators';
+import InvestmentIdeas from '../../components/home/InvestmentIdeas';
+import { 
+  DAILY_FINANCIAL_TIP,
+  FINANCIAL_TERMS,
+  MARKET_LESSONS,
+  ECONOMIC_INDICATORS,
+  INVESTMENT_IDEAS,
+  type FinancialTip,
+  type FinancialTerm,
+  type MarketLesson,
+  type EconomicIndicator,
+  type InvestmentIdea
+} from '../../constants/educationData';
 
 export default function Home() {
   const router = useRouter();
-  const { userId, userProfile } = useUser();
+  const { user } = useClerkUser();
   const [aiInsights, setAIInsights] = useState(null);
   const [marketData, setMarketData] = useState(null);
   const [latestAnalysis, setLatestAnalysis] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [financialTip, setFinancialTip] = useState<FinancialTip | null>(null);
+  const [financialTerms, setFinancialTerms] = useState<FinancialTerm[]>([]);
+  const [marketLessons, setMarketLessons] = useState<MarketLesson[]>([]);
+  const [economicIndicators, setEconomicIndicators] = useState<EconomicIndicator[]>([]);
+  const [investmentIdeas, setInvestmentIdeas] = useState<InvestmentIdea[]>([]);
 
   useEffect(() => {
     loadData();
-  }, [userId]);
+  }, []);
 
   const loadData = async () => {
     try {
       setIsLoading(true);
       const [insights, market, analysis] = await Promise.all([
-        getAIInsights(userId),
+        getAIInsights(),
         getMarketOverview(),
-        getLatestAnalysis(userId)
+        getLatestAnalysis()
       ]);
 
+      setFinancialTip(DAILY_FINANCIAL_TIP);
+      setFinancialTerms(FINANCIAL_TERMS);
+      setMarketLessons(MARKET_LESSONS);
+      setEconomicIndicators(ECONOMIC_INDICATORS);
+      setInvestmentIdeas(INVESTMENT_IDEAS);
       setAIInsights(insights);
       setMarketData(market);
       setLatestAnalysis(analysis);
@@ -72,18 +96,20 @@ export default function Home() {
           <View style={styles.header}>
             <View>
               <Text style={styles.greeting}>{getGreeting()},</Text>
-              <Text style={styles.userName}>{userProfile?.name || 'User'}</Text>
+              <Text style={styles.userName}>
+                {user?.firstName || user?.emailAddresses[0]?.emailAddress || 'User'}
+              </Text>
             </View>
             <View style={styles.headerActions}>
               <TouchableOpacity 
                 style={styles.iconButton} 
-                onPress={() => router.push("/search")}
+                onPress={() => {}}
               >
                 <MaterialIcons name="search" size={24} color={COLORS.textPrimary} />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.iconButton}
-                onPress={() => router.push("/notifications")}
+                onPress={() => {}}
               >
                 <View style={styles.notificationBadge}>
                   <FontAwesome5 name="bell" size={24} color={COLORS.textPrimary} />
@@ -97,20 +123,36 @@ export default function Home() {
         <View style={styles.content}>
           <AIHighlights 
             onPress={() => router.push("/ai-analyst")}
-            userId={userId}
           />
           <QuickActions />
-          <MarketPulse 
-            data={marketData}
-            onPress={() => router.push("/stocks")}
+          <EconomicIndicators indicators={economicIndicators} />
+          <Text style={styles.sectionTitle}>Market Education</Text>
+          {marketLessons.map((lesson, index) => (
+            <MarketEducation
+              key={index}
+              lesson={lesson}
+              onPress={() => router.push(`/education/lesson/${index}`)}
+            />
+          ))}
+          
+          <InvestmentIdeas 
+            ideas={investmentIdeas}
+            onPress={() => router.push("/investment-ideas")}
           />
-          <SmartAlerts 
-            alerts={latestAnalysis?.alerts}
-            onPress={() => router.push("/notifications")}
-          />
-          <PersonalizedInsights 
-            insights={latestAnalysis?.insights}
-            onPress={() => router.push("/chatbot")}
+          
+          {financialTip && (
+            <View>
+              <Text style={styles.sectionTitle}>Learn & Grow</Text>
+              <FinancialTipCard 
+                tip={financialTip}
+                onPress={() => router.push("/education/tips")}
+              />
+            </View>
+          )}
+
+          <FinancialTerms 
+            terms={financialTerms}
+            onPress={() => router.push("/education/glossary")}
           />
         </View>
       </ScrollView>

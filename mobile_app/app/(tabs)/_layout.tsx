@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS } from "../../constants/theme";
 
 export default function TabLayout() {
@@ -55,6 +56,15 @@ export default function TabLayout() {
           title: "Stocks",
           tabBarIcon: ({ color }) => (
             <FontAwesome5 name="chart-line" size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="news"
+        options={{
+          title: 'News',
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="article" size={24} color={color} />
           ),
         }}
       />

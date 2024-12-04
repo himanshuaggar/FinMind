@@ -9,13 +9,48 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { COLORS } from "../constants/theme";
 import { UserProvider } from "../contexts/UserContext";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ClerkProvider, useAuth, ClerkLoaded } from "@clerk/clerk-expo";
+import Constants from "expo-constants";
+import { Slot } from 'expo-router'
+import * as SecureStore from 'expo-secure-store'
+
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!
+
+if (!publishableKey) {
+  throw new Error('Missing Publishable Key')
+}
+
 export default function RootLayout() {
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
   const router = useRouter();
+  const tokenCache = {
+    async getToken(key: string) {
+      try {
+        const item = await SecureStore.getItemAsync(key)
+        if (item) {
+          console.log(`${key} was used 🔐 \n`)
+        } else {
+          console.log('No values stored under key: ' + key)
+        }
+        return item
+      } catch (error) {
+        console.error('SecureStore get item error: ', error)
+        await SecureStore.deleteItemAsync(key)
+        return null
+      }
+    },
+    async saveToken(key: string, value: string) {
+      try {
+        return SecureStore.setItemAsync(key, value)
+      } catch (err) {
+        return
+      }
+    },
+  }
 
   const [fontsLoaded] = useFonts({
     'Roboto-Regular': require('../assets/fonts/Roboto-Regular.ttf'),
@@ -52,56 +87,70 @@ export default function RootLayout() {
   }
 
   return (
-    <UserProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <StatusBar style="light" />
-        <SafeAreaView style={{ flex: 1 }} onLayout={onLayoutRootView}>
-          <Stack
-            initialRouteName={isFirstLaunch ? "onboarding" : "(tabs)"}
-            screenOptions={{
-              headerStyle: {
-                backgroundColor: COLORS.background,
-              },
-              headerTintColor: COLORS.textPrimary,
-              headerTitleStyle: {
-                fontFamily: "Roboto-Bold",
-              },
-              contentStyle: {
-                backgroundColor: COLORS.background,
-              },
-            }}
-          >
-            <Stack.Screen
-              name="onboarding"
-              options={{
-                headerShown: false,
-                gestureEnabled: false,
-              }}
-            />
-            <Stack.Screen
-              name="(tabs)"
-              options={{
-                headerShown: false,
-                gestureEnabled: false,
-              }}
-            />
-            <Stack.Screen
-              name="modal"
-              options={{
-                presentation: "modal",
+    <ClerkProvider
+      publishableKey={publishableKey}
+      tokenCache={tokenCache}
+    >
+      <UserProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <StatusBar style="light" />
+          <SafeAreaView style={{ flex: 1 }} onLayout={onLayoutRootView}>
+            <Stack
+              initialRouteName={isFirstLaunch ? "(auth)/welcome" : "(tabs)"}
+              screenOptions={{
                 headerStyle: {
                   backgroundColor: COLORS.background,
                 },
-                headerTintColor: COLORS.primary,
+                headerTintColor: COLORS.textPrimary,
                 headerTitleStyle: {
-                  fontFamily: "Roboto-Medium",
+                  fontFamily: "Roboto-Bold",
+                },
+                contentStyle: {
+                  backgroundColor: COLORS.background,
                 },
               }}
-            />
-          </Stack>
-        </SafeAreaView>
-      </GestureHandlerRootView>
-    </UserProvider>
+            >
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="(auth)"
+                options={{
+                  headerShown: false,
+                  gestureEnabled: false,
+                }}
+              />
+              <Stack.Screen
+                name="onboarding"
+                options={{
+                  headerShown: false,
+                  gestureEnabled: false,
+                }}
+              />
+              <Stack.Screen
+                name="(tabs)"
+                options={{
+                  headerShown: false,
+                  gestureEnabled: false,
+                }}
+              />
+              {/* Remove or add the modal route as needed */}
+              {/* <Stack.Screen
+                name="modal"
+                options={{
+                  presentation: "modal",
+                  headerStyle: {
+                    backgroundColor: COLORS.background,
+                  },
+                  headerTintColor: COLORS.primary,
+                  headerTitleStyle: {
+                    fontFamily: "Roboto-Medium",
+                  },
+                }}
+              /> */}
+            </Stack>
+          </SafeAreaView>
+        </GestureHandlerRootView>
+      </UserProvider>
+    </ClerkProvider>
   );
 }
 

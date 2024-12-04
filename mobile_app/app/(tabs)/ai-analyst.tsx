@@ -16,7 +16,6 @@ export default function AIAnalyst() {
         tabBarStyle: { backgroundColor: COLORS.background },
       }}
     >
-      <Tab.Screen name="Market" component={MarketSentiment} />
       <Tab.Screen name="News" component={NewsAnalysis} />
       <Tab.Screen name="Reports" component={ReportAnalysis} />
     </Tab.Navigator>
