@@ -1,7 +1,6 @@
 import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import { useAuth } from "@clerk/clerk-expo";
-
 import { fetchAPI } from "./fetch";
 
 export const tokenCache = {

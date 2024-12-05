@@ -80,7 +80,7 @@ export const analyzeFinancialReports = async (files: FormData, query?: string) =
     params: { query },
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  console.log(response.data);
+  // console.log(response.data);
   return response.data;
 };
 
@@ -180,7 +180,6 @@ function isValidNumberObject(obj: any): boolean {
 
 export const analyzeStock = async (symbol: string) => {
   const response = await api.post(API_ENDPOINTS.STOCK_ANALYSIS, { symbol });
-  console.log(response.data);
   return response.data;
 };
 
@@ -471,7 +470,7 @@ export const getStockChartData = async (symbol: string, range: '1D' | '1W' | '1M
     const cacheTime = await storage.get(`${cacheKey}_time`);
 
     // Use cache if it's less than 5 minutes old
-    if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
+    if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300) {
       return cachedData;
     }
 
@@ -499,6 +498,7 @@ export const getStockChartData = async (symbol: string, range: '1D' | '1W' | '1M
         includePrePost: false
       }
     });
+    // console.log(response)
 
     if (!response?.data?.chart?.result?.[0]) {
       throw new Error('Invalid response structure');
@@ -538,240 +538,299 @@ interface SectorPerformance {
 
 const YAHOO_FINANCE_API_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
+const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+// console.log(ALPHA_VANTAGE_API_KEY)
+
 export const getAIInsights = async () => {
   try {
-    const [marketNews, sectorPerformance, volatilityData] = await Promise.all([
-      fetchMarketNews(),
-      fetchSectorPerformance(),
-      fetchVolatilityIndex()
-    ]);
+    // Check cache first
+    const cachedData = await storage.get('ai_insights');
+    const cacheTime = await storage.get('ai_insights_time');
 
-    const marketTrends = processSectorPerformance(sectorPerformance);
-    const topInsights = processMarketInsights(marketNews, volatilityData);
-    const tradingVolume = calculateTradingVolume(sectorPerformance);
+    if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
+      return cachedData;
+    }
 
-    return {
-      marketSummary: generateMarketSummary(marketTrends, volatilityData, marketNews),
-      tradingVolume,
-      volatilityIndex: volatilityData.value,
-      marketTrends,
-      topInsights,
+    // Your existing API calls...
+    const marketData = {
+      marketSummary: "Markets are showing mixed signals with selective buying in key sectors.",
+      tradingVolume: 125000000,
+      volatilityIndex: 15.7,
+      marketTrends: [
+        {
+          direction: 'up',
+          percentage: 2.3,
+          sector: 'Technology',
+          analysis: 'Strong earnings and AI developments driving growth'
+        },
+        {
+          direction: 'down',
+          percentage: 1.1,
+          sector: 'Energy',
+          analysis: 'Oil price volatility affecting sector performance'
+        },
+        {
+          direction: 'neutral',
+          percentage: 0.2,
+          sector: 'Banking',
+          analysis: 'Sector consolidating after recent gains'
+        }
+      ],
+      topInsights: [
+        {
+          category: 'Market Analysis',
+          title: 'Technology Sector Momentum',
+          description: 'Tech stocks showing resilience amid market volatility with strong institutional buying.',
+          impact: 'positive',
+          confidence: 85,
+          icon: 'microchip'
+        },
+        {
+          category: 'Economic Outlook',
+          title: 'Interest Rate Impact',
+          description: 'Recent policy decisions suggest stable interest rates in the near term.',
+          impact: 'neutral',
+          confidence: 75,
+          icon: 'chart-line'
+        },
+        {
+          category: 'Sector Analysis',
+          title: 'Banking Sector Update',
+          description: 'Banking stocks showing mixed trends with focus on asset quality.',
+          impact: 'negative',
+          confidence: 70,
+          icon: 'university'
+        }
+      ],
       lastUpdated: new Date().toISOString()
     };
+
+    // Cache the data
+    await storage.set('ai_insights', marketData);
+    await storage.set('ai_insights_time', Date.now().toString());
+
+    return marketData;
   } catch (error) {
-    console.error('Error fetching AI insights:', error);
-    return getMockMarketData();
+    console.error('Error fetching market insights:', error);
+    // Return mock data if API fails
+    return {
+      marketSummary: "Markets showing resilience with technology and banking sectors leading.",
+      tradingVolume: 125000000,
+      volatilityIndex: 15.7,
+      marketTrends: [
+        {
+          direction: 'up',
+          percentage: 2.3,
+          sector: 'Technology',
+          analysis: 'Strong earnings and AI developments driving growth'
+        },
+        {
+          direction: 'down',
+          percentage: 1.1,
+          sector: 'Energy',
+          analysis: 'Oil price volatility affecting sector performance'
+        },
+        {
+          direction: 'neutral',
+          percentage: 0.2,
+          sector: 'Banking',
+          analysis: 'Sector consolidating after recent gains'
+        }
+      ],
+      topInsights: [
+        {
+          category: 'Market Analysis',
+          title: 'Technology Sector Momentum',
+          description: 'Tech stocks showing resilience amid market volatility.',
+          impact: 'positive',
+          confidence: 85,
+          icon: 'microchip'
+        },
+        {
+          category: 'Economic Outlook',
+          title: 'Interest Rate Impact',
+          description: 'Recent policy decisions suggest stable rates.',
+          impact: 'neutral',
+          confidence: 75,
+          icon: 'chart-line'
+        },
+        {
+          category: 'Sector Analysis',
+          title: 'Banking Sector Update',
+          description: 'Banking stocks showing mixed trends.',
+          impact: 'negative',
+          confidence: 70,
+          icon: 'university'
+        }
+      ],
+      lastUpdated: new Date().toISOString()
+    };
   }
 };
 
-async function fetchMarketNews() {
+export const getEconomicIndicators = async () => {
   try {
-    // Using Yahoo Finance API for news
-    const response = await axios.get(
-      'https://query1.finance.yahoo.com/v1/news/list',
-      {
-        params: {
-          region: 'US',
-          snippetCount: 5
-        }
-      }
-    );
+    // Fetch Indian economic indicators
+    const indicators = await Promise.all([
+      // GDP Growth Rate
+      axios.get(`https://www.alphavantage.co/query?function=REAL_GDP&interval=quarterly&apikey=${ALPHA_VANTAGE_API_KEY}`),
+      // Inflation Rate
+      axios.get(`https://www.alphavantage.co/query?function=INFLATION&apikey=${ALPHA_VANTAGE_API_KEY}`),
+      // Interest Rate
+      axios.get(`https://www.alphavantage.co/query?function=FEDERAL_FUNDS_RATE&apikey=${ALPHA_VANTAGE_API_KEY}`),
+      // Unemployment Rate
+      axios.get(`https://www.alphavantage.co/query?function=UNEMPLOYMENT&apikey=${ALPHA_VANTAGE_API_KEY}`)
+    ]);
 
-    return response.data.items.map((article: any) => ({
-      headline: article.title,
-      summary: article.summary,
-      category: article.category || 'general',
-      url: article.link,
-      datetime: new Date(article.published_at).getTime()
-    }));
+    return processEconomicData(indicators);
   } catch (error) {
-    console.error('Error fetching market news:', error);
-    return getMockNews();
+    console.error('Error fetching economic indicators:', error);
   }
-}
+};
 
-async function fetchSectorPerformance() {
-  try {
-    // Using Yahoo Finance API for sector performance
-    const sectors = ['^GSPC', '^DJI', '^IXIC', '^RUT', '^TNX'];
-    const responses = await Promise.all(
-      sectors.map(symbol =>
-        axios.get(`${YAHOO_FINANCE_API_URL}/${symbol}`, {
-          params: {
-            interval: '1d',
-            range: '1d'
-          }
-        })
-      )
-    );
-
-    return responses.map((response, index) => ({
-      symbol: sectors[index],
-      data: response.data.chart.result[0]
-    }));
-  } catch (error) {
-    console.error('Error fetching sector performance:', error);
-    return getMockSectorPerformance();
-  }
-}
-
-async function fetchVolatilityIndex() {
-  try {
-    // Using VIX index from Yahoo Finance
-    const response = await axios.get(`${YAHOO_FINANCE_API_URL}/%5EVIX`, {
-      params: {
-        interval: '1d',
-        range: '1d'
-      }
-    });
-
-    const result = response.data.chart.result[0];
+// Helper function to process market data
+const processMarketData = (indianData: any, globalData: any, sectorData: any, newsData: any) => {
+  // console.log(indianData)
+  const niftyData = indianData['Global Quote'];
+  // console.log(niftyData)
+  const spxData = globalData['Global Quote'];
+  const sectors = sectorData['Sector Performance'];
+  
+  // Check if niftyData and spxData are defined
+  if (!niftyData || !spxData) {
+    console.warn('Nifty or SPX data is undefined, returning default values.');
     return {
-      value: result.meta.regularMarketPrice,
-      previousClose: result.meta.previousClose
+      marketSummary: 'No market data available.',
+      tradingVolume: 0,
+      volatilityIndex: 1.5,
+      marketTrends: [],
+      topInsights: [],
+      lastUpdated: new Date().toISOString()
     };
-  } catch (error) {
-    console.error('Error fetching volatility index:', error);
-    return { value: 15, previousClose: 14.5 };
   }
-}
-
-function processSectorPerformance(sectorData: any[]): MarketTrend[] {
-  return sectorData.map(sector => {
-    const meta = sector.data.meta;
-    const currentPrice = meta.regularMarketPrice;
-    const previousClose = meta.previousClose;
-    const percentage = ((currentPrice - previousClose) / previousClose) * 100;
-
-    return {
-      direction: percentage > 0 ? 'up' : percentage < 0 ? 'down' : 'neutral',
-      percentage: Math.abs(percentage),
-      sector: getSectorName(sector.symbol),
-      analysis: generateSectorAnalysis(percentage, sector.symbol)
-    };
-  });
-}
-
-function getSectorName(symbol: string): string {
-  const sectorMap: { [key: string]: string } = {
-    '^GSPC': 'S&P 500',
-    '^DJI': 'Dow Jones',
-    '^IXIC': 'NASDAQ',
-    '^RUT': 'Russell 2000',
-    '^TNX': 'Treasury Yield'
-  };
-  return sectorMap[symbol] || symbol;
-}
-
-function processMarketInsights(marketNews: any[], marketIndicators: any, volatilityData: any) {
-  const insights = [];
-
-  // Process market news for insights
-  const significantNews = marketNews
-    .slice(0, 5)
-    .map(news => analyzeNewsImpact(news));
-
-  insights.push(...significantNews);
-
-  // Add volatility insight if significant
-  if (volatilityData.value > 20) {
-    insights.push({
-      category: 'Risk Alert',
-      title: 'High Market Volatility',
-      description: `VIX at ${volatilityData.value.toFixed(2)} indicates elevated market uncertainty. Consider defensive positioning.`,
-      impact: 'negative',
-      confidence: 90,
-      icon: 'chart-line'
-    });
-  }
-
-  return insights.slice(0, 3); // Return top 3 insights
-}
-
-function generateSectorAnalysis(sector: string, performance: number): string {
-  const trend = performance > 0 ? 'gaining' : 'declining';
-  const strength = Math.abs(performance) > 2 ? 'strong' : 'moderate';
-
-  const sectorAnalysis = {
-    Technology: {
-      positive: 'driven by strong earnings and AI developments',
-      negative: 'facing pressure from valuation concerns'
-    },
-    Healthcare: {
-      positive: 'benefiting from defensive positioning',
-      negative: 'impacted by regulatory concerns'
-    },
-    Energy: {
-      positive: 'supported by rising commodity prices',
-      negative: 'affected by demand uncertainty'
-    }
-  };
-
-  const sectorInfo = sectorAnalysis[sector] || {
-    positive: 'showing positive momentum',
-    negative: 'experiencing downward pressure'
-  };
-
-  return `${sector} is ${trend} with ${strength} momentum, ${performance > 0 ? sectorInfo.positive : sectorInfo.negative
-    }`;
-}
-
-function analyzeNewsImpact(news: any) {
-  const sentiment = analyzeSentiment(news.headline + ' ' + news.summary);
 
   return {
-    category: 'Market News',
-    title: news.headline.slice(0, 50) + '...',
-    description: news.summary.slice(0, 100) + '...',
-    impact: sentiment.score > 0 ? 'positive' : sentiment.score < 0 ? 'negative' : 'neutral',
-    confidence: Math.round(Math.abs(sentiment.score) * 100),
-    icon: getNewsIcon(news.category)
+    marketSummary: generateMarketSummary(niftyData, spxData, sectors),
+    tradingVolume: parseInt(niftyData['06. volume']) || 0, // Ensure this is defined
+    volatilityIndex: calculateVolatility(niftyData),
+    marketTrends: generateMarketTrends(sectors),
+    topInsights: generateInsightsFromNews(newsData.articles),
+    lastUpdated: new Date().toISOString()
   };
-}
+};
 
-function analyzeSentiment(text: string) {
-  const positiveWords = ['growth', 'gain', 'positive', 'surge', 'rise'];
-  const negativeWords = ['decline', 'loss', 'negative', 'fall', 'risk'];
+// Helper function to process economic data
+const processEconomicData = (indicators: any[]) => {
+  return [
+    {
+      name: 'GDP Growth',
+      value: `${indicators[0].data.data[0].value}%`,
+      change: calculateChange(indicators[0].data.data),
+      trend: calculateTrend(indicators[0].data.data),
+      icon: 'show-chart'
+    },
+    {
+      name: 'Inflation',
+      value: `${indicators[1].data.data[0].value}%`,
+      change: calculateChange(indicators[1].data.data),
+      trend: calculateTrend(indicators[1].data.data),
+      icon: 'trending-up'
+    },
+    {
+      name: 'Interest Rate',
+      value: `${indicators[2].data.data[0].value}%`,
+      change: calculateChange(indicators[2].data.data),
+      trend: calculateTrend(indicators[2].data.data),
+      icon: 'account-balance'
+    },
+    {
+      name: 'Unemployment',
+      value: `${indicators[3].data.data[0].value}%`,
+      change: calculateChange(indicators[3].data.data),
+      trend: calculateTrend(indicators[3].data.data),
+      icon: 'groups'
+    }
+  ];
+};
 
-  const words = text.toLowerCase().split(' ');
-  const positiveCount = words.filter(word => positiveWords.includes(word)).length;
-  const negativeCount = words.filter(word => negativeWords.includes(word)).length;
+const generateMarketSummary = (niftyData: any, spxData: any, sectors: any[]): string => {
+  // Check if sectors array is empty
+  if (!sectors || sectors.length === 0) {
+    return 'No sector data available.';
+  }
 
-  const score = (positiveCount - negativeCount) / words.length;
-  return { score };
-}
-
-function getNewsIcon(category: string): string {
-  const iconMap = {
-    earnings: 'chart-bar',
-    technology: 'microchip',
-    economy: 'university',
-    general: 'newspaper'
-  };
-  return iconMap[category] || 'info-circle';
-}
-
-function calculateTradingVolume(marketIndicators: any): number {
-  return marketIndicators.volume || 125000000;
-}
-
-function generateMarketSummary(
-  marketTrends: any[],
-  volatilityData: any,
-  marketNews: any[]
-): string {
-  const topSectors = marketTrends
-    .sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage))
+  // Sort sectors by changesPercentage and get the top two
+  const topSectors = sectors
+    .sort((a, b) => Math.abs(b.changesPercentage) - Math.abs(a.changesPercentage))
     .slice(0, 2);
 
-  const volatilityStatus = volatilityData.value > 20 ? 'elevated' : 'moderate';
+  // Handle case where there is only one sector
+  const leadingSector = topSectors[0] || { sector: 'N/A', changesPercentage: 0 };
+  const secondSector = topSectors[1] || { sector: 'N/A', changesPercentage: 0 };
 
-  const significantNews = marketNews[0]?.headline || '';
+  const significantNews = 'Latest market news summary here'; // Placeholder for news summary
 
-  return `Market showing ${volatilityStatus} volatility (VIX: ${volatilityData.value.toFixed(1)}). ${topSectors[0].sector
-    } leads ${topSectors[0].direction === 'up' ? 'gains' : 'losses'} at ${topSectors[0].percentage.toFixed(1)
-    }%. ${significantNews}`;
+  return `Market summary: ${leadingSector.sector} leads with ${leadingSector.changesPercentage}%. ${secondSector.sector} follows with ${secondSector.changesPercentage}%. ${significantNews}`;
+};
+
+// Helper function to calculate volatility
+function calculateVolatility(marketData: any): number {
+  try {
+    const changes = marketData?.[0]?.quotes?.map(
+      (quote: any) => quote.regularMarketChangePercent
+    ) || [];
+
+    // Check if changes array is empty
+    if (changes.length === 0) {
+      return 1.5; // Default moderate volatility
+    }
+
+    const avg = changes.reduce((a: number, b: number) => a + b, 0) / changes.length;
+    const variance = changes.reduce((a: number, b: number) => a + Math.pow(b - avg, 2), 0) / changes.length;
+    return Math.sqrt(variance);
+  } catch (error) {
+    console.error('Error calculating volatility:', error);
+    return 1.5; // Default moderate volatility
+  }
 }
+
+// Helper function to calculate change
+const calculateChange = (data: any[]) => {
+  const current = parseFloat(data[0].value);
+  const previous = parseFloat(data[1].value);
+  const change = ((current - previous) / previous) * 100;
+  return `${change.toFixed(2)}%`;
+};
+
+// Helper function to calculate trend
+const calculateTrend = (data: any[]) => {
+  const current = parseFloat(data[0].value);
+  const previous = parseFloat(data[1].value);
+  return current >= previous ? 'up' : 'down';
+};
+
+// Helper function to generate insights from news
+const generateInsightsFromNews = (newsArticles: any[]): any[] => {
+  return newsArticles.map((article: any) => ({
+    title: article.title || 'Market Update',
+    description: article.description || 'Market analysis update',
+    timestamp: new Date(article.publishedAt || Date.now()).toISOString()
+  }));
+};
+
+// Helper function to get news icon based on category
+const getNewsIcon = (category: string): string => {
+  switch (category) {
+    case 'business':
+      return 'business-center';
+    case 'technology':
+      return 'computer';
+    case 'economy':
+      return 'monetization-on';
+    default:
+      return 'info';
+  }
+};
 
 export const getLatestAnalysis = async () => {
   try {
@@ -808,20 +867,6 @@ export const getLatestAnalysis = async () => {
     return getMockLatestAnalysis();
   }
 };
-
-// Helper functions
-function calculateVolatility(marketData: any): number {
-  try {
-    const changes = marketData?.[0]?.quotes?.map(
-      (quote: any) => quote.regularMarketChangePercent
-    ) || [];
-    const avg = changes.reduce((a: number, b: number) => a + b, 0) / changes.length;
-    const variance = changes.reduce((a: number, b: number) => a + Math.pow(b - avg, 2), 0) / changes.length;
-    return Math.sqrt(variance);
-  } catch (error) {
-    return 1.5; // Default moderate volatility
-  }
-}
 
 function generateAlerts(newsData: any): any[] {
   try {
@@ -1079,31 +1124,26 @@ const NEWS_API_KEY = "25989c6cfcc8415d9a8f10121bc11e36";
 
 export const getNews = async (category: NewsCategory = 'all'): Promise<NewsItem[]> => {
   try {
-    // Check cache first
-    // const cacheKey = `news_${category}`;
-    // const cachedData = await storage.get(cacheKey);
-    // const cacheTime = await storage.get(`${cacheKey}_time`);
+    const cacheKey = `news_${category}`;
+    const cachedData = await storage.get(cacheKey);
+    const cacheTime = await storage.get(`${cacheKey}_time`);
 
-    // // Use cache if it's less than 15 minutes old
-    // if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 90) {
-    //   return JSON.parse(cachedData);
-    // }
+    // Use cache if it's less than 15 minutes old
+    if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 90000) {
+      return JSON.parse(cachedData);
+    }
 
     let endpoint = `${NEWSAPI_BASE_URL}/top-headlines`;
     let params: any = {
       country: 'us',
       apiKey: NEWS_API_KEY,
-      category:'business'
     };
 
-    // if (category !== 'all') {
-    //   params.category = category;
-    // }
-    console.log(endpoint)
-    console.log(params)
+    if (category !== 'all') {
+      params.category = category; // Ensure category is included in the API request
+    }
 
     const response = await axios.get(endpoint, { params });
-    console.log(response)
 
     const newsItems = response.data.articles.map((article: any, index: number) => ({
       id: `${article.publishedAt}-${index}`,
@@ -1117,13 +1157,29 @@ export const getNews = async (category: NewsCategory = 'all'): Promise<NewsItem[
       content: article.content
     }));
 
-    // // Cache the data
-    // await storage.set(cacheKey, JSON.stringify(newsItems));
-    // await storage.set(`${cacheKey}_time`, Date.now().toString());
+    // Cache the data
+    await storage.set(cacheKey, JSON.stringify(newsItems));
+    await storage.set(`${cacheKey}_time`, Date.now().toString());
 
     return newsItems;
   } catch (error) {
     console.error('Error fetching news:', error);
     return getMockData.news(category);
   }
+};
+
+// Function to generate market trends based on sector performance
+const generateMarketTrends = (sectors: any[]): { direction: string; percentage: number; sector: string; analysis: string }[] => {
+  return sectors.map(sector => {
+    const { sector: sectorName, changesPercentage } = sector;
+    const direction = changesPercentage > 0 ? 'up' : 'down';
+    const analysis = `The ${sectorName} sector has ${direction} by ${Math.abs(changesPercentage).toFixed(2)}%.`;
+
+    return {
+      direction,
+      percentage: Math.abs(changesPercentage),
+      sector: sectorName,
+      analysis
+    };
+  });
 };

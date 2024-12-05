@@ -122,16 +122,16 @@ export default function Home() {
 
         <View style={styles.content}>
           <AIHighlights 
-            onPress={() => router.push("/ai-analyst")}
+            onPress={() => {}}
           />
           <QuickActions />
           <EconomicIndicators indicators={economicIndicators} />
           <Text style={styles.sectionTitle}>Market Education</Text>
-          {marketLessons.map((lesson, index) => (
+          {marketLessons.map((lesson) => (
             <MarketEducation
-              key={index}
+              key={lesson.title}
               lesson={lesson}
-              onPress={() => router.push(`/education/lesson/${index}`)}
+              onPress={() => router.push(`/webview?url=${encodeURIComponent(lesson.contentUrl)}`)}
             />
           ))}
           

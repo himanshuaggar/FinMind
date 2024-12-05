@@ -41,6 +41,7 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.small,
     alignItems: 'center',
     justifyContent: 'center',
+    margin: SIZES.medium,
   },
   primary: {
     backgroundColor: COLORS.primary,

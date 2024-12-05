@@ -21,7 +21,7 @@ export default function QuickActions() {
           <TouchableOpacity 
             key={index}
             style={styles.actionItem}
-            onPress={() => router.push(action.route)}
+            onPress={() => {}}
           >
             <View style={styles.iconContainer}>
               <FontAwesome5 name={action.icon} size={24} color={COLORS.primary} />

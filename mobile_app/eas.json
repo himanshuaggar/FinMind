@@ -1,0 +1,37 @@
+{
+  "cli": {
+    "version": ">= 13.4.2",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "ALPHA_VANTAGE_API_KEY": "LE1K6Z4M79NYN52O",
+        "FINNHUB_API_KEY": "ct4mt4pr01qo7vqaonc0ct4mt4pr01qo7vqaoncg",
+        "NEWS_API_KEY": "25989c6cfcc8415d9a8f10121bc11e36",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Zm9uZC11cmNoaW4tMTguY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "DATABASE_URL": "postgresql://neondb_owner:ZL4dWeK0SlEO@ep-soft-moon-a12nr37b.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
+        "EXPO_PUBLIC_API_URL": "exp://192.168.1.6:8081"
+      }
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "ALPHA_VANTAGE_API_KEY": "LE1K6Z4M79NYN52O",
+        "FINNHUB_API_KEY": "ct4mt4pr01qo7vqaonc0ct4mt4pr01qo7vqaoncg",
+        "NEWS_API_KEY": "25989c6cfcc8415d9a8f10121bc11e36",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Zm9uZC11cmNoaW4tMTguY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "DATABASE_URL": "postgresql://neondb_owner:ZL4dWeK0SlEO@ep-soft-moon-a12nr37b.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
+        "EXPO_PUBLIC_API_URL": "exp://192.168.1.6:8081"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

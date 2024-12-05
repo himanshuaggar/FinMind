@@ -6,6 +6,7 @@ import StockInfo from '../../components/stocks/StockInfo';
 import RiskAssessment from '../../components/stocks/RiskAssessment';
 import { analyzeStock } from '../../services/api';
 import { COLORS, SIZES } from '../../constants/theme';
+import Loading from '../../components/common/Loading';
 
 export default function Stocks() {
   const [loading, setLoading] = useState(false);
@@ -28,38 +29,28 @@ export default function Stocks() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <StockSearch onSearch={handleSearch} loading={loading} />
-
-        {error ? (
-          <Text style={styles.error}>{error}</Text>
-        ) : null}
-
-        {stockData && (
-          <View style={styles.content}>
-            {Array.isArray(stockData.historical_data) ? (
-              <StockChart
-                data={{
-                  dates: stockData.historical_data.map(d => d.date),
-                  prices: stockData.historical_data.map(d => d.close),
-                }}
-                symbol={stockData.symbol}
-              />
-            ) : (
-              <Text style={styles.error}>No historical data available.</Text>
-            )}
-            <StockInfo fundamentals={stockData.fundamentals} />
-            <RiskAssessment stockData={stockData} />
-
-            <View style={styles.recommendationContainer}>
-              <Text style={styles.recommendationTitle}>Analysis</Text>
-              <Text style={styles.recommendationText}>
-                {stockData.recommendation}
-              </Text>
+      <Text style={styles.header}>Stock Analysis</Text>
+      <StockSearch onSearch={handleSearch} loading={loading} />
+      {loading && <Loading />}
+      {error ? (
+        <Text style={styles.error}>{error}</Text>
+      ) : (
+        <ScrollView>
+          {stockData && (
+            <View style={styles.content}>
+              <StockChart symbol={stockData.symbol} initialData={stockData.chartData} />
+              <StockInfo fundamentals={stockData.fundamentals} />
+              {/* <RiskAssessment stockData={stockData} /> */}
+              <View style={styles.recommendationContainer}>
+                <Text style={styles.recommendationTitle}>Analysis</Text>
+                <Text style={styles.recommendationText}>
+                  {stockData.recommendation}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -70,11 +61,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     height: "100%",
   },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    padding: 16,
+    textAlign: 'center',
+  },
   content: {
     padding: SIZES.medium,
   },
   error: {
-    color: COLORS.tertiary,
+    color: COLORS.error,
     padding: SIZES.medium,
     textAlign: 'center',
   },

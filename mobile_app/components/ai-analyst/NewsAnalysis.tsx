@@ -47,7 +47,7 @@ export default function NewsAnalysis() {
             style={[styles.input, styles.queryInput]}
             value={query}
             onChangeText={setQuery}
-            placeholder="E.g., What are the main points of disagreement?"
+            placeholder="E.g., What are the highlights?"
             placeholderTextColor={COLORS.textSecondary}
           />
 

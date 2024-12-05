@@ -34,7 +34,25 @@ export default function StockChart({ symbol, initialData }: StockChartProps) {
       setLoading(true);
       setError('');
       const data = await getStockChartData(symbol, range);
-      setChartData(data);
+      console.log(data);
+
+      const historicalData = data.prices;
+      const dates = data.dates;
+      const prices = historicalData;
+
+      const previousClose = data.previousClose || 0;
+      const currentPrice = data.currentPrice || 0;
+
+      setChartData({
+        symbol: data.symbol,
+        currentPrice: currentPrice,
+        previousClose: previousClose,
+        change: previousClose ? ((currentPrice - previousClose) / previousClose) * 100 : 0,
+        dates: dates,
+        prices: prices,
+        volumes: data.volumes || [],
+        range
+      });
       setTimeRange(range);
     } catch (err) {
       setError('Failed to load chart data');
@@ -80,6 +98,31 @@ export default function StockChart({ symbol, initialData }: StockChartProps) {
         </View>
       </View>
 
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : chartData && (
+        <LineChart
+          data={{
+            labels: chartData.dates.map(date =>
+              new Date(date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+              })
+            ).filter((_, i) => i % Math.ceil(chartData.dates.length / 6) === 0),
+            datasets: [{ data: chartData.prices }]
+          }}
+          width={screenWidth - 60}
+          height={220}
+          chartConfig={chartConfig}
+          bezier
+          style={styles.chart}
+          withDots={false}
+          withInnerLines={false}
+          withOuterLines={true}
+          withVerticalLabels={true}
+          withHorizontalLabels={true}
+        />
+      )}
       <View style={styles.timeRangeContainer}>
         {timeRanges.map((range) => (
           <TouchableOpacity
@@ -99,32 +142,6 @@ export default function StockChart({ symbol, initialData }: StockChartProps) {
           </TouchableOpacity>
         ))}
       </View>
-
-      {error ? (
-        <Text style={styles.errorText}>{error}</Text>
-      ) : chartData && (
-        <LineChart
-          data={{
-            labels: chartData.dates.map(date => 
-              new Date(date).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
-              })
-            ).filter((_, i) => i % Math.ceil(chartData.dates.length / 6) === 0),
-            datasets: [{ data: chartData.prices }]
-          }}
-          width={screenWidth - 32}
-          height={220}
-          chartConfig={chartConfig}
-          bezier
-          style={styles.chart}
-          withDots={false}
-          withInnerLines={false}
-          withOuterLines={true}
-          withVerticalLabels={true}
-          withHorizontalLabels={true}
-        />
-      )}
     </View>
   );
 }

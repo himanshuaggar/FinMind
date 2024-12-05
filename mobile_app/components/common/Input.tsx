@@ -26,10 +26,10 @@ export default function Input({ label, error, style, ...props }: InputProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SIZES.small,
+    margin: SIZES.medium,
   },
   label: {
-    fontSize: SIZES.small,
+    fontSize: SIZES.medium,
     color: COLORS.textPrimary,
     marginBottom: SIZES.xSmall,
   },

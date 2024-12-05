@@ -41,7 +41,7 @@ export default function StockSearch({ onSearch, loading }: StockSearchProps) {
         </TouchableOpacity>
       </View>
       <Text style={styles.hint}>
-        Example: AAPL, GOOGL, MSFT
+        Example: RELIANCE.NS, HDFCBANK.NS, TATAMOTORS.NS
       </Text>
     </View>
   );

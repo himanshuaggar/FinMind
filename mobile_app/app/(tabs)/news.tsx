@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getNews } from '../../services/api';
 import NewsCard from '../../components/news/NewsCard';
@@ -54,6 +54,7 @@ export default function News() {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.header}>Latest News</Text>
       <NewsFilter
         selectedCategory={selectedCategory}
         onSelectCategory={setSelectedCategory}
@@ -79,6 +80,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    padding: 16,
+    textAlign: 'center',
   },
   newsList: {
     padding: SIZES.medium,
