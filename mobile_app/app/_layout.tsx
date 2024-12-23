@@ -10,6 +10,7 @@ import { UserProvider } from "../contexts/UserContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
 import * as SecureStore from 'expo-secure-store'
+import { checkAPIHealth } from "../services/api";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,6 +42,21 @@ function InitialLayout() {
 
   useEffect(() => {
     checkFirstLaunch();
+  }, []);
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const isHealthy = await checkAPIHealth();
+        if (!isHealthy) {
+          console.warn('API is not healthy');
+        }
+      } catch (error) {
+        console.error('Error checking API health:', error);
+      }
+    };
+
+    checkHealth();
   }, []);
 
   const checkFirstLaunch = async () => {

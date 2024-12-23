@@ -16,7 +16,14 @@ export default function NewsAnalysis() {
     try {
       setLoading(true);
       const urlList = urls.split('\n').filter(url => url.trim());
-      const result = await analyzeNews(urlList, query);
+      
+      if (urlList.length === 0) {
+        console.error('No valid URLs provided');
+        return;
+      }
+
+      const result = await analyzeNews(urlList, query.trim() || undefined);
+      console.log('Analysis result:', result); 
       setAnalysis(result);
     } catch (error) {
       console.error('Error analyzing news:', error);

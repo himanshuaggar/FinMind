@@ -25,7 +25,7 @@ export default function Select({ label, value, onValueChange, items }: SelectPro
                             key={item.value}
                             label={item.label}
                             value={item.value}
-                            color={COLORS.textPrimary}
+                            color={COLORS.primary}
                         />
                     ))}
                 </Picker>
@@ -50,5 +50,7 @@ const styles = StyleSheet.create({
     },
     picker: {
         height: 50,
+        color:COLORS.primary,
+        backgroundColor: COLORS.cardBackground,
     },
 });

@@ -4,7 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, API_ENDPOINTS, EXTERNAL_APIS } from '../constants/api';
 import { storage } from './storage';
 import { Portfolio, WatchlistItem, Goal, MarketSentiment } from '../types';
-import { NEWS_CACHE_TIME } from '../constants/config';
 import { NewsItem, NewsCategory } from '../types/news';
 
 const api = axios.create({
@@ -15,10 +14,20 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor for authentication
 api.interceptors.request.use(
   async (config) => {
     try {
+      const lastHealthCheck = await storage.get('last_health_check');
+      const now = Date.now();
+
+      if (!lastHealthCheck || (now - Number(lastHealthCheck)) > 300000) { 
+        const isHealthy = await checkAPIHealth();
+        if (!isHealthy) {
+          console.warn('API health check failed');
+        }
+        await storage.set('last_health_check', now.toString());
+      }
+
       // Add auth token if available
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
@@ -26,7 +35,7 @@ api.interceptors.request.use(
       }
       return config;
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      console.error('Error in request interceptor:', error);
       return config;
     }
   },
@@ -48,7 +57,6 @@ api.interceptors.response.use(
   }
 );
 
-// Wrapper function for API calls with error handling
 const apiCall = async <T>(
   method: 'get' | 'post' | 'put' | 'delete',
   endpoint: string,
@@ -56,8 +64,22 @@ const apiCall = async <T>(
   config?: any
 ): Promise<T> => {
   try {
-    const response = await api[method](endpoint, data, config);
-    return response.data;
+    switch (method) {
+      case 'get':
+        const getResponse = await api.get(endpoint, config);
+        return getResponse.data;
+      case 'post':
+        const postResponse = await api.post(endpoint, data, config);
+        return postResponse.data;
+      case 'put':
+        const putResponse = await api.put(endpoint, data, config);
+        return putResponse.data;
+      case 'delete':
+        const deleteResponse = await api.delete(endpoint, config);
+        return deleteResponse.data;
+      default:
+        throw new Error(`Unsupported HTTP method: ${method}`);
+    }
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error(`API Error (${endpoint}):`, {
@@ -70,18 +92,31 @@ const apiCall = async <T>(
   }
 };
 
-// Update your API functions to use the wrapper
 export const analyzeNews = async (urls: string[], query?: string) => {
-  return apiCall('/api/analyze-news', 'post', { urls, query });
+  try {
+    const response = await api.post(API_ENDPOINTS.NEWS_ANALYSIS, {
+      urls: urls,
+      query: query || "Analyze these news articles and provide key insights"
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error analyzing news:', error);
+    throw error;
+  }
 };
 
-export const analyzeFinancialReports = async (files: FormData, query?: string) => {
-  const response = await api.post(API_ENDPOINTS.FINANCIAL_REPORTS, files, {
-    params: { query },
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-  // console.log(response.data);
-  return response.data;
+export const analyzeFinancialReports = async (formData: FormData) => {
+  try {
+    const response = await api.post(API_ENDPOINTS.FINANCIAL_REPORTS, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error analyzing reports:', error);
+    throw error;
+  }
 };
 
 export const chatWithAdvisor = async (financialData: FinancialData, query: string) => {
@@ -695,7 +730,7 @@ const processMarketData = (indianData: any, globalData: any, sectorData: any, ne
   // console.log(niftyData)
   const spxData = globalData['Global Quote'];
   const sectors = sectorData['Sector Performance'];
-  
+
   // Check if niftyData and spxData are defined
   if (!niftyData || !spxData) {
     console.warn('Nifty or SPX data is undefined, returning default values.');
@@ -719,7 +754,6 @@ const processMarketData = (indianData: any, globalData: any, sectorData: any, ne
   };
 };
 
-// Helper function to process economic data
 const processEconomicData = (indicators: any[]) => {
   return [
     {
@@ -946,56 +980,6 @@ function getMockInsights() {
   ];
 }
 
-function getMockNews() {
-  return [
-    {
-      headline: 'Markets Rally on Economic Data',
-      summary: 'Stock markets show strong gains as economic indicators exceed expectations.',
-      category: 'general',
-      url: '#',
-      datetime: Date.now()
-    },
-    {
-      headline: 'Tech Sector Leads Market Gains',
-      summary: 'Technology stocks continue to drive market momentum with strong earnings reports.',
-      category: 'technology',
-      url: '#',
-      datetime: Date.now()
-    },
-    {
-      headline: 'Federal Reserve Policy Update',
-      summary: 'Fed signals continued focus on price stability while monitoring economic growth.',
-      category: 'economy',
-      url: '#',
-      datetime: Date.now()
-    }
-  ];
-}
-
-function getMockMarketData() {
-  return {
-    marketSummary: "Markets showing mixed signals with technology sector leading gains.",
-    tradingVolume: 125000000,
-    volatilityIndex: 15.7,
-    marketTrends: [
-      {
-        direction: 'up',
-        percentage: 2.3,
-        sector: 'Technology',
-        analysis: 'Strong earnings and AI developments driving growth'
-      },
-      {
-        direction: 'down',
-        percentage: 1.1,
-        sector: 'Energy',
-        analysis: 'Oil price volatility affecting sector performance'
-      }
-    ],
-    topInsights: getMockInsights(),
-    lastUpdated: new Date().toISOString()
-  };
-}
-
 function generateInsights(newsData: any): any[] {
   try {
     return (newsData?.feed || [])
@@ -1013,44 +997,8 @@ function generateInsights(newsData: any): any[] {
   }
 }
 
-function getMockMarketIndicators() {
-  return {
-    marketStatus: 'open',
-    volume: 125000000,
-    indices: [
-      {
-        symbol: '^GSPC',
-        price: 4185.82,
-        volume: 42000000,
-        change: 35.88,
-        changePercent: 0.85
-      },
-      {
-        symbol: '^DJI',
-        price: 32945.84,
-        volume: 38000000,
-        change: 171.32,
-        changePercent: 0.52
-      },
-      {
-        symbol: '^IXIC',
-        price: 14284.34,
-        volume: 45000000,
-        change: 181.74,
-        changePercent: 1.28
-      }
-    ]
-  };
-}
-
-// Cache key constants
-const NEWS_CACHE_KEY = 'news_cache_';
-const NEWS_LAST_FETCH_KEY = 'news_last_fetch_';
-const API_CALL_COUNT_KEY = 'news_api_calls_';
-
 const NEWSAPI_BASE_URL = 'https://newsapi.org/v2';
 
-// Consolidated mock data functions
 const getMockData = {
   news: (category: NewsCategory = 'all'): NewsItem[] => {
     return [
@@ -1168,7 +1116,6 @@ export const getNews = async (category: NewsCategory = 'all'): Promise<NewsItem[
   }
 };
 
-// Function to generate market trends based on sector performance
 const generateMarketTrends = (sectors: any[]): { direction: string; percentage: number; sector: string; analysis: string }[] => {
   return sectors.map(sector => {
     const { sector: sectorName, changesPercentage } = sector;
@@ -1182,4 +1129,14 @@ const generateMarketTrends = (sectors: any[]): { direction: string; percentage: 
       analysis
     };
   });
+};
+
+export const checkAPIHealth = async () => {
+  try {
+    const response = await api.get('https://finmind.onrender.com/health');
+    return response.data.status === 'healthy';
+  } catch (error) {
+    console.error('Health check failed:', error);
+    return false;
+  }
 };

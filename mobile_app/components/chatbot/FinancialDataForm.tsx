@@ -199,7 +199,7 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
             onChangeText={setNewGoal}
             onSubmitEditing={handleAddGoal}
           />
-          <Button title="Add" onPress={handleAddGoal} />
+          <Button title="Add" onPress={handleAddGoal} variant='primary' />
         </View>
         {(financialData.goals || []).map((goal, index) => (
           <View key={index} style={styles.goalItem}>
@@ -207,7 +207,7 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
             <Button 
               title="Remove" 
               onPress={() => handleRemoveGoal(index)}
-              type="secondary"
+              variant='secondary'
             />
           </View>
         ))}
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.small,
   },
   goalInput: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent:'space-between',
     marginBottom: SIZES.small,

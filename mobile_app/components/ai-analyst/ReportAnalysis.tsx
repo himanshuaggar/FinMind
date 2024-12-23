@@ -101,22 +101,31 @@ export default function ReportAnalysis() {
       setLoading(true);
       const formData = new FormData();
 
-      files.forEach((file) => {
+      files.forEach((file, index) => {
         formData.append('files', {
           uri: file.uri,
-          name: file.name,
-          type: 'application/pdf'
+          type: 'application/pdf',
+          name: file.name || `file${index}.pdf`
         } as any);
       });
 
-      formData.append('query', query);
-      formData.append('analysis_type', analysisType);
+      if (query) {
+        formData.append('query', query);
+      }
 
+      console.log('Sending analysis request...'); 
       const response = await analyzeFinancialReports(formData);
-      setResult(response.result);
-      setSources(response.sources || []);
+      console.log('Analysis response:', response); 
+      
+      if (response.result) {
+        setResult(response.result);
+        setSources(response.sources || []);
+      } else {
+        console.error('No result in response');
+      }
     } catch (error) {
       console.error('Error analyzing reports:', error);
+      // You might want to show an error message to the user here
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 import yfinance as yf
 import os
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -19,7 +21,6 @@ from fastapi.responses import JSONResponse
 from langchain.prompts import PromptTemplate
 from contextlib import asynccontextmanager
 
-# Define lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -28,15 +29,13 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down FastAPI application")
 
-# Initialize FastAPI with lifespan
 app = FastAPI(lifespan=lifespan)
 
-# Update CORS settings
 origins = [
-    "http://localhost:3000",     # React local development
-    "http://localhost:8000",     # FastAPI local development
-    "https://your-frontend-domain.com",  # Your deployed frontend URL
-    "*"  # During development - remove in production
+    "http://localhost:3000",     
+    "http://localhost:8000",     
+    "https://your-frontend-domain.com",  
+    "*" 
 ]
 
 app.add_middleware(
@@ -47,16 +46,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load environment variables
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
-# Configure Google AI
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# Initialize LLM
 llm = ChatGoogleGenerativeAI(
     model="gemini-pro",
     temperature=0.7,
@@ -64,7 +60,6 @@ llm = ChatGoogleGenerativeAI(
     convert_system_message_to_human=True
 )
 
-# Pydantic models for request/response
 class NewsRequest(BaseModel):
     urls: List[str]
     query: Optional[str] = None
@@ -83,8 +78,110 @@ class ChatRequest(BaseModel):
 
 class StockRequest(BaseModel):
     symbol: str
+    
+class MarketOverview(BaseModel):
+    timestamp: str
+    market_overview: dict
+    market_analysis: str
+    market_visualization: str | None
+    metadata: dict
+    
+NIFTY_SECTORS = {
+    'NIFTY AUTO': '^CNXAUTO',
+    'NIFTY BANK': '^NSEBANK',
+    'NIFTY FMCG': '^CNXFMCG',
+    'NIFTY IT': '^CNXIT',
+    'NIFTY METAL': '^CNXMETAL',
+    'NIFTY PHARMA': '^CNXPHARMA',
+    'NIFTY REALTY': '^CNXREALTY',
+    'NIFTY ENERGY': '^CNXENERGY',
+    'NIFTY FINANCIAL SERVICES': '^CNXFIN',
+    'NIFTY MEDIA': '^CNXMEDIA',
+    'NIFTY HEALTHCARE': 'NIFTY_HEALTHCARE.NS',
+    'NIFTY CONSUMER DURABLES': 'NIFTY_CONSR_DURBL.NS',
+    'NIFTY OIL AND GAS': 'NIFTY_OIL_AND_GAS.NS',
+    'NIFTY METALS & MINING': '^CNXMETAL',
+    'NIFTY CONSUMER SERVICES': '^CNXSERVICE', 
+}
 
-# Configure logging
+NIFTY500_SYMBOLS = [
+    '3MINDIA.NS', 'AARTIIND.NS', 'AAVAS.NS', 'ABB.NS', 'ABBOTINDIA.NS',
+    'ABCAPITAL.NS', 'ABFRL.NS', 'ACC.NS', 'ADANIENT.NS', 'ADANIGREEN.NS',
+    'ADANIPORTS.NS', 'ADANIPOWER.NS', 'ADANITRANS.NS', 'ADVENZYMES.NS', 'AEGISCHEM.NS',
+    'AFFLE.NS', 'AJANTPHARM.NS', 'AKZOINDIA.NS', 'ALEMBICLTD.NS', 'ALKEM.NS',
+    'ALKYLAMINE.NS', 'ALLCARGO.NS', 'AMARAJABAT.NS', 'AMBER.NS', 'AMBUJACEM.NS',
+    'APARINDS.NS', 'APLLTD.NS', 'APOLLOHOSP.NS', 'APOLLOTYRE.NS', 'ARVINDFASN.NS',
+    'ASAHIINDIA.NS', 'ASHOKLEY.NS', 'ASIANPAINT.NS', 'ASTERDM.NS', 'ASTRAL.NS',
+    'ATGL.NS', 'ATUL.NS', 'AUBANK.NS', 'AUROPHARMA.NS', 'AVANTIFEED.NS',
+    'AWL.NS', 'AXISBANK.NS', 'BAJAJ-AUTO.NS', 'BAJAJCON.NS', 'BAJAJELEC.NS',
+    'BAJAJFINSV.NS', 'BAJAJHLDNG.NS', 'BAJFINANCE.NS', 'BALAMINES.NS', 'BALKRISIND.NS',
+    'BALRAMCHIN.NS', 'BANDHANBNK.NS', 'BANKBARODA.NS', 'BANKINDIA.NS', 'BASF.NS',
+    'BATAINDIA.NS', 'BBTC.NS', 'BDL.NS', 'BEL.NS', 'BEML.NS',
+    'BERGEPAINT.NS', 'BHARATFORG.NS', 'BHARATRAS.NS', 'BHARATWIRE.NS', 'BHARTIARTL.NS',
+    'BHEL.NS', 'BIOCON.NS', 'BIRLACORPN.NS', 'BLUEDART.NS', 'BLUESTARCO.NS',
+    'BOSCHLTD.NS', 'BPCL.NS', 'BRIGADE.NS', 'BRITANNIA.NS', 'BSE.NS',
+    'BSOFT.NS', 'CANBK.NS', 'CANFINHOME.NS',
+    'CAPLIPOINT.NS', 'CARBORUNIV.NS', 'CASTROLIND.NS', 'CCL.NS', 'CDSL.NS',
+    'CEATLTD.NS', 'CENTRALBK.NS', 'CERA.NS', 'CESC.NS',
+    'CHAMBLFERT.NS', 'CHEMPLASTS.NS', 'CHOLAFIN.NS', 'CIPLA.NS', 'COALINDIA.NS',
+    'COCHINSHIP.NS', 'COFORGE.NS', 'COLPAL.NS', 'CONCOR.NS', 'COROMANDEL.NS',
+    'CREDITACC.NS', 'CRISIL.NS', 'CROMPTON.NS', 'CSBBANK.NS', 'CUB.NS',
+    'CUMMINSIND.NS', 'CYIENT.NS', 'DABUR.NS', 'DALBHARAT.NS', 'DBL.NS',
+    'DCAL.NS', 'DCBBANK.NS', 'DCMSHRIRAM.NS', 'DEEPAKNTR.NS', 'DELTACORP.NS',
+    'DEVYANI.NS', 'DHANI.NS', 'DIAMONDYD.NS', 'DIVISLAB.NS', 'DIXON.NS',
+    'DLF.NS', 'DMART.NS', 'DRREDDY.NS', 'EASEMYTRIP.NS', 'ECLERX.NS',
+    'EDELWEISS.NS', 'EICHERMOT.NS', 'EIDPARRY.NS', 'EIHOTEL.NS', 'ELGIEQUIP.NS',
+    'EMAMILTD.NS', 'ENDURANCE.NS', 'ENGINERSIN.NS', 'EPL.NS', 'EQUITASBNK.NS',
+    'ERIS.NS', 'ESCORTS.NS', 'ESABINDIA.NS', 'EXIDEIND.NS', 'FDC.NS',
+    'FEDERALBNK.NS', 'FINEORG.NS', 'FLUOROCHEM.NS', 'FORTIS.NS', 'FSL.NS',
+    'GAIL.NS', 'GALAXYSURF.NS', 'GARFIBRES.NS', 'GEPIL.NS', 'GESHIP.NS',
+    'GHCL.NS', 'GICRE.NS', 'GILLETTE.NS', 'GLAND.NS', 'GLAXO.NS',
+    'GLENMARK.NS', 'GMMPFAUDLR.NS', 'GNFC.NS', 'GODFRYPHLP.NS', 'GODREJAGRO.NS',
+    'GODREJCP.NS', 'GODREJIND.NS', 'GODREJPROP.NS', 'GOKEX.NS', 'GOLDIAM.NS',
+    'GRANULES.NS', 'GRAPHITE.NS', 'GRASIM.NS', 'GREAVESCOT.NS', 'GREENPANEL.NS',
+    'GREENPLY.NS', 'GRINDWELL.NS', 'GRSE.NS', 'GSFC.NS', 'GSPL.NS',
+    'GUJGASLTD.NS', 'GUJALKALI.NS', 'GUJFLUORO.NS', 'GUJGASLTD.NS', 'GULFOILLUB.NS',
+    'HAPPSTMNDS.NS', 'HATSUN.NS', 'HAVELLS.NS', 'HCLTECH.NS',
+    'HDFCAMC.NS', 'HDFCBANK.NS', 'HDFCLIFE.NS', 'HEG.NS', 'HEIDELBERG.NS',
+    'HERITGFOOD.NS', 'HEROMOTOCO.NS', 'HFCL.NS', 'HIKAL.NS', 'HINDALCO.NS',
+    'HINDCOPPER.NS', 'HINDPETRO.NS', 'HINDUNILVR.NS', 'HINDZINC.NS', 'HONAUT.NS',
+    'HUDCO.NS', 'IBREALEST.NS', 'IBULHSGFIN.NS', 'ICICIBANK.NS', 'ICICIGI.NS',
+    'ICICIPRULI.NS', 'IDEA.NS', 'IDFC.NS', 'IDFCFIRSTB.NS', 'IEX.NS',
+    'IGL.NS', 'IIFSEC.NS', 'INDHOTEL.NS', 'INDIACEM.NS', 'INDIAMART.NS',
+    'INDIGO.NS', 'INDOCO.NS', 'INDUSINDBK.NS', 'INDUSTOWER.NS', 'INFIBEAM.NS',
+    'INFY.NS', 'INGERRAND.NS', 'INOXLEISUR.NS', 'IOB.NS', 'IOC.NS',
+    'IPCALAB.NS', 'IRB.NS', 'IRCON.NS', 'ITC.NS', 'ITI.NS',
+    'J&KBANK.NS', 'JAGRAN.NS', 'JAICORPLTD.NS', 'JAMNAAUTO.NS', 'JBCHEPHARM.NS',
+    'JCHAC.NS', 'JINDALSAW.NS', 'JINDALSTEL.NS', 'JISLJALEQS.NS', 'JKCEMENT.NS',
+    'JKLAKSHMI.NS', 'JKPAPER.NS', 'JKTYRE.NS', 'JMFINANCIL.NS', 'JSL.NS',
+    'JSWENERGY.NS', 'JSWSTEEL.NS', 'JTEKTINDIA.NS', 'JUBLFOOD.NS', 'JUBLPHARMA.NS',
+    'JUSTDIAL.NS', 'JYOTHYLAB.NS', 'KALPATPOWR.NS', 'KANSAINER.NS', 'KARURVYSYA.NS',
+    'KAJARIACER.NS', 'KEC.NS', 'KEI.NS', 'KNRCON.NS', 'KOTAKBANK.NS',
+    'KRBL.NS', 'KSCL.NS', 'KSB.NS', 'KTL.NS', 'L&TFH.NS',
+    'LAOPALA.NS', 'LAXMIMACH.NS', 'LEMONTREE.NS', 'LICHSGFIN.NS', 'LINDEINDIA.NS',
+    'LT.NS', 'LTI.NS', 'LTTS.NS', 'LUPIN.NS', 'LUXIND.NS',
+    'M&M.NS', 'M&MFIN.NS', 'MAHABANK.NS', 'MAHINDCIE.NS', 'MAHLIFE.NS',
+    'MANAPPURAM.NS', 'MARICO.NS', 'MARUTI.NS', 'MASFIN.NS', 'MASTEK.NS',
+    'MFSL.NS', 'MGL.NS', 'MINDACORP.NS', 'MINDAIND.NS', 'MINDTREE.NS',
+    'MOTILALOFS.NS', 'MPHASIS.NS', 'MRF.NS', 'MRPL.NS', 'MUTHOOTFIN.NS',
+    'NATCOPHARM.NS', 'NATIONALUM.NS', 'NAUKRI.NS', 'NAVINFLUOR.NS', 'NBCC.NS',
+    'NCC.NS', 'NESTLEIND.NS', 'NETWORK18.NS', 'NFL.NS', 'NH.NS',
+    'NIACL.NS', 'NLCINDIA.NS', 'NMDC.NS', 'NTPC.NS', 'OBEROIRLTY.NS',
+    'OIL.NS', 'ONGC.NS', 'PAGEIND.NS', 'PEL.NS', 'PERSISTENT.NS',
+    'PETRONET.NS', 'PFC.NS', 'PFIZER.NS', 'PGHH.NS', 'PGHL.NS',
+    'PHOENIXLTD.NS', 'PIDILITIND.NS', 'PIIND.NS', 'PNB.NS', 'POLYCAB.NS',
+    'POLYMED.NS', 'POWERGRID.NS', 'PRAJIND.NS', 'PRESTIGE.NS', 'PRINCEPIPE.NS',
+    'PRSMJOHNSN.NS', 'PSB.NS', 'PVR.NS', 'QUESS.NS', 'RADICO.NS',
+    'RAIN.NS', 'RAJESHEXPO.NS', 'RALLIS.NS', 'RAMCOCEM.NS', 'RATNAMANI.NS',
+    'RAYMOND.NS', 'RBLBANK.NS', 'RECLTD.NS', 'REDINGTON.NS', 'RELAXO.NS',
+    'RELIANCE.NS', 'RENUKA.NS', 'RHIM.NS', 'RITES.NS', 'RVNL.NS',
+    'TATAPOWER.NS', 'TATASTEEL.NS', 'TCS.NS', 'TECHM.NS', 'TITAN.NS',
+    'TORNTPHARM.NS', 'TORNTPOWER.NS', 'TRENT.NS', 'TVSMOTOR.NS', 'UBL.NS',
+    'ULTRACEMCO.NS', 'UPL.NS', 'VEDL.NS', 'VOLTAS.NS', 'WIPRO.NS',
+    'ZEEL.NS','ZOMATO.NS','ZYDUSWELL.NS'
+]
+
+
 logging.basicConfig(level=logging.INFO)
 logger.setLevel(logging.INFO)
 
@@ -446,6 +543,143 @@ def generate_financial_advice(metrics, data, query):
             return response.text
         except Exception as e:
             return f"Error generating advice: {str(e)}"
+        
+def fetch_stock_performance():
+    stock_performance = {}
+
+    for symbol in NIFTY500_SYMBOLS:
+        try:
+            stock_data = yf.Ticker(symbol).history(period='1d')
+            if stock_data.empty:
+                logger.warning(f"No data for stock {symbol}. Skipping.")
+                continue
+
+            stock_info = yf.Ticker(symbol).info
+            company_name = stock_info.get('longName', symbol)
+            current_price = float(stock_data['Close'].iloc[-1])
+            change_pct = ((stock_data['Close'].iloc[-1] - stock_data['Open'].iloc[0]) / 
+                          stock_data['Open'].iloc[0]) * 100
+            volume = int(stock_data['Volume'].iloc[-1])
+
+            stock_performance[symbol] = {
+                'name': company_name,
+                'price': current_price,
+                'change_percentage': float(change_pct),
+                'volume': volume
+            }
+        except Exception as e:
+            logger.error(f"Error fetching data for stock {symbol}: {str(e)}")
+            continue
+
+    return stock_performance
+
+def fetch_sector_performance():
+    sector_performance = {}
+
+    for sector_name, symbol in NIFTY_SECTORS.items():
+        try:
+            sector_data = yf.Ticker(symbol).history(period='5d')
+            if not sector_data.empty:
+                start_price = float(sector_data['Close'].iloc[0])
+                end_price = float(sector_data['Close'].iloc[-1])
+                change_pct = ((end_price - start_price) / start_price) * 100
+                sector_performance[sector_name] = float(change_pct)
+        except Exception as e:
+            logger.error(f"Error fetching data for sector {sector_name}: {str(e)}")
+            continue
+    
+    return sector_performance
+
+def generate_market_analysis(sector_performance, stock_performance):
+    try:
+        top_sector = max(sector_performance, key=sector_performance.get)
+        worst_sector = min(sector_performance, key=sector_performance.get)
+        top_stock = max(stock_performance, key=lambda x: stock_performance[x]['change_percentage'])
+        worst_stock = min(stock_performance, key=lambda x: stock_performance[x]['change_percentage'])
+
+        analysis = (
+            f"Today, the top-performing sector is {top_sector} with a change of {sector_performance[top_sector]:.2f}%. "
+            f"The sector facing the most challenges is {worst_sector} with a change of {sector_performance[worst_sector]:.2f}%. "
+            f"Among stocks, {stock_performance[top_stock]['name']} showed the highest gain of {stock_performance[top_stock]['change_percentage']:.2f}%. "
+            f"On the other hand, {stock_performance[worst_stock]['name']} faced the largest decline of {stock_performance[worst_stock]['change_percentage']:.2f}%."
+        )
+        return analysis
+    except Exception as e:
+        logger.error(f"Error generating market analysis: {str(e)}")
+        return "Unable to generate market analysis due to incomplete data."
+
+def create_market_overview_chart(sector_performance):
+    try:
+        if not sector_performance:
+            return None
+
+        sectors = list(sector_performance.keys())
+        changes = list(sector_performance.values())
+
+        fig = go.Figure(
+            data=[go.Bar(x=sectors, y=changes, marker_color=['green' if x > 0 else 'red' for x in changes])]
+        )
+
+        fig.update_layout(
+            title="Sector Performance Overview",
+            xaxis_title="Sector",
+            yaxis_title="Percentage Change",
+            template="plotly_white"
+        )
+
+        return fig
+    except Exception as e:
+        logger.error(f"Error creating market overview chart: {str(e)}")
+        return None
+
+@app.get("/market-insights", response_model=MarketOverview)
+async def get_market_insights():
+    try:
+        sector_performance = fetch_sector_performance()
+        stock_performance = fetch_stock_performance()
+
+        if not sector_performance or not stock_performance:
+            raise HTTPException(
+                status_code=500,
+                detail="No market data available. Please try again later."
+            )
+
+        top_sectors = dict(sorted(sector_performance.items(), key=lambda x: x[1], reverse=True)[:5])
+        bottom_sectors = dict(sorted(sector_performance.items(), key=lambda x: x[1])[:5])
+
+        sorted_stocks = sorted(stock_performance.items(), key=lambda x: x[1]['change_percentage'], reverse=True)
+        top_gainers = dict(sorted_stocks[:5])
+        top_losers = dict(sorted_stocks[-5:])
+
+        market_analysis = generate_market_analysis(sector_performance, stock_performance)
+        market_chart = create_market_overview_chart(sector_performance)
+        chart_json = market_chart.to_json() if market_chart else None
+
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "market_overview": {
+                "top_performing_sectors": top_sectors,
+                "underperforming_sectors": bottom_sectors,
+                "top_gainers": top_gainers,
+                "top_losers": top_losers,
+                "trending_stocks": dict(sorted(stock_performance.items(), key=lambda x: x[1]['volume'], reverse=True)[:5])
+            },
+            "market_analysis": market_analysis,
+            "market_visualization": chart_json,
+            "metadata": {
+                "data_delay": "15 minutes",
+                "disclaimer": "For educational and informational purposes only. Not financial advice.",
+                "data_source": "Yahoo Finance",
+                "market": "Indian Equity Market"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error in /market-insights endpoint: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Error fetching market insights", "message": str(e)}
+        )
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
@@ -462,27 +696,23 @@ async def general_exception_handler(request, exc):
         content={"detail": "Internal server error. Please try again later."}
     )
 
-# Update the main block for proper port binding
 if __name__ == "__main__":
-    # Check if running on Render
     is_render = os.environ.get('IS_RENDER', False)
     
     if is_render:
-        # Production settings for Render
         port = int(os.environ.get("PORT", 10000))
         uvicorn.run(
-            app,  # Pass the app instance directly
+            app,  
             host="0.0.0.0",
             port=port,
-            workers=1,  # Reduce workers to debug issues
+            workers=1,  
             log_level="info",
             timeout_keep_alive=30,
             loop="auto"
         )
     else:
-        # Local development settings
         uvicorn.run(
-            app,  # Pass the app instance directly
+            app,  
             host="127.0.0.1",
             port=8000,
             reload=True
