@@ -154,7 +154,7 @@ with st.sidebar:
         change_page("Stock Financial Advisor")
 
 if st.session_state.current_page == "Home":
-    st.title("Welcome to FinAnalytiQ - A Smart Finance Assistant 🚀")
+    st.title("Welcome to FinMind - A Smart Finance Assistant 🚀")
     st.markdown("""
         <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                     padding: 2rem; 

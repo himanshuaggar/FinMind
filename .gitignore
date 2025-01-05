@@ -1,4 +1,7 @@
 .env
 README.md
 __pycache__/
-
+faiss_store_finance/
+faiss_store_gemini/
+faiss_store_news/
+*.pkl
