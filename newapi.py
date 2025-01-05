@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import yfinance as yf
 import os
+import tempfile
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -286,46 +287,210 @@ async def analyze_news(request: NewsRequest):
     except Exception as e:
         logger.error(f"Unexpected error in analyze_news: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+    
+# Query templates for financial report analysis
+query_templates = {
+    "Financial Metrics Analysis": {
+        "template": """Analyze the following financial metrics:
+        1. Revenue and Growth
+        2. Profit Margins
+        3. ROE and ROA
+        4. Debt to Equity Ratio
+        5. Working Capital
+        Please provide specific numbers and year-over-year comparisons."""
+    },
+    "Risk Assessment": {
+        "template": """Identify and analyze:
+        1. Key Business Risks
+        2. Market Risks
+        3. Financial Risks
+        4. Operational Risks
+        5. Regulatory Risks
+        Provide specific examples and potential impact assessments."""
+    },
+    "Market Trends": {
+        "template": """Analyze the following market aspects:
+        1. Industry Growth Trends
+        2. Market Share Analysis
+        3. Consumer Behavior Shifts
+        4. Technology Impact
+        5. Future Market Projections
+        Include specific data points and market statistics."""
+    },
+    "Competitive Analysis": {
+        "template": """Provide analysis of:
+        1. Major Competitors
+        2. Market Position
+        3. Competitive Advantages
+        4. Market Share Comparison
+        5. Strategic Initiatives
+        Include specific competitor comparisons and market data."""
+    },
+    "Regulatory Compliance": {
+        "template": """Evaluate:
+        1. Current Compliance Status
+        2. Regulatory Requirements
+        3. Recent/Upcoming Regulatory Changes
+        4. Compliance Costs
+        5. Potential Regulatory Risks
+        Highlight specific regulations and their impact."""
+    },
+    "Investment Opportunities": {
+        "template": """Analyze:
+        1. Growth Potential
+        2. Investment Risks
+        3. Valuation Metrics
+        4. Market Opportunity
+        5. Strategic Advantages
+        Provide specific investment metrics and potential returns."""
+    },
+    "Custom Query": {
+        "template": ""
+    }
+}
 
-@app.post("/api/analyze-financial-reports")
-async def analyze_financial_reports(files: List[UploadFile] = File(...), query: Optional[str] = None):
+# Function to get analysis prompt based on analysis type
+def get_analysis_prompt(analysis_type):
+    base_template = """You are a financial expert specialized in {analysis_type}. 
+    Analyze the provided information and give a detailed response.
+    
+    When analyzing, consider:
+    {specific_considerations}
+    
+    Context: {context}
+    Question: {question}
+    
+    Provide a structured analysis with:
+    1. Key Findings
+    2. Detailed Analysis
+    3. Supporting Data
+    4. Recommendations
+    """
+    
+    specific_considerations = {
+        "Financial Metrics Analysis": """
+        - Revenue trends and growth rates
+        - Profitability metrics (Gross margin, Operating margin, Net margin)
+        - Return metrics (ROE, ROA, ROIC)
+        - Liquidity ratios
+        - Cash flow analysis""",
+        
+        "Risk Assessment": """
+        - Market risks and volatility
+        - Operational risks
+        - Financial risks
+        - Strategic risks
+        - External risk factors""",
+        
+        "Market Trends": """
+        - Industry growth patterns
+        - Market share dynamics
+        - Consumer behavior shifts
+        - Technological disruptions
+        - Competitive landscape changes""",
+        
+        "Competitive Analysis": """
+        - Market position
+        - Competitive advantages
+        - Peer comparison
+        - Strategic initiatives
+        - Market share analysis""",
+        
+        "Regulatory Compliance": """
+        - Current regulatory status
+        - Upcoming regulatory changes
+        - Compliance costs
+        - Industry standards
+        - Risk mitigation measures""",
+        
+        "Investment Opportunities": """
+        - Growth potential
+        - Valuation metrics
+        - Risk-return profile
+        - Market opportunities
+        - Investment timeline""",
+        
+        "Custom Query": """
+        - Relevant metrics
+        - Key data points
+        - Industry context
+        - Historical trends
+        - Future implications"""
+    }
+    
+    return PromptTemplate(
+        template=base_template,
+        input_variables=["context", "question"],
+        partial_variables={
+            "analysis_type": analysis_type,
+            "specific_considerations": specific_considerations.get(analysis_type, "")
+        }
+    )
+
+class AnalysisRequest(BaseModel):
+    analysis_type: str
+    question: str
+
+@app.post("/api/upload-financial-reports/")
+async def upload_financial_reports(files: List[UploadFile] = File(...)):
+    documents = []
     try:
-        documents = []
         for file in files:
             temp_path = f"temp_{file.filename}"
             with open(temp_path, "wb") as f:
-                content = await file.read()
-                f.write(content)
+                f.write(file.file.read())
             loader = PyPDFLoader(temp_path)
             documents.extend(loader.load())
             os.remove(temp_path)
 
-        # Process documents similar to news analysis
+        # Split documents
         text_splitter = RecursiveCharacterTextSplitter(
             separators=['\n\n', '\n', '.', ','],
             chunk_size=1000
         )
         docs = text_splitter.split_documents(documents)
-        
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        vectorstore = FAISS.from_documents(docs, embeddings)
-        
-        if query:
-            chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                chain_type="stuff",
-                retriever=vectorstore.as_retriever(),
-                return_source_documents=True
-            )
-            result = chain({"query": query})
-            return {"result": result["result"], "sources": [doc.metadata for doc in result["source_documents"]]}
 
-        return {"status": "Financial reports processed successfully"}
+        # Create embeddings
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        vectorstore_finance = FAISS.from_documents(docs, embeddings)
+        vectorstore_finance.save_local("faiss_store_finance")
+        return {"message": "Financial reports processed successfully!"}
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error processing financial reports: {str(e)}")
 
-# API endpoints for Financial Advisory Chatbot
+@app.post("/api/analyze-financial-reports/")
+async def analyze_financial_reports(request: AnalysisRequest):
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        vectorstore = FAISS.load_local(
+            "faiss_store_finance", 
+            embeddings,
+            allow_dangerous_deserialization=True
+        )
+        
+        analysis_prompt = get_analysis_prompt(request.analysis_type)
+        
+        chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=vectorstore.as_retriever(),
+            return_source_documents=True,
+            chain_type_kwargs={"prompt": analysis_prompt}
+        )
+        
+        result = chain({"query": request.question})
+        
+        return {
+            "analysis_type": request.analysis_type,
+            "result": result["result"],
+            "sources": [doc.metadata.get("source", "") for doc in result["source_documents"]]
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing financial reports: {str(e)}")
+
 @app.post("/api/chat")
 async def chat_with_advisor(request: ChatRequest):
     try:
