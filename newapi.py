@@ -24,10 +24,8 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     logger.info("Starting up FastAPI application")
     yield
-    # Shutdown
     logger.info("Shutting down FastAPI application")
 
 app = FastAPI(lifespan=lifespan)
@@ -186,26 +184,21 @@ NIFTY500_SYMBOLS = [
 logging.basicConfig(level=logging.INFO)
 logger.setLevel(logging.INFO)
 
-# Add a health check endpoint
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
-# API endpoints for Finance AI Analyst
 @app.post("/api/analyze-news")
 async def analyze_news(request: NewsRequest):
     try:
         if not request.urls:
             raise HTTPException(status_code=400, detail="No URLs provided")
 
-        # Add validation for URLs
         valid_urls = [url for url in request.urls if url and url.startswith(('http://', 'https://'))]
         if not valid_urls:
             raise HTTPException(status_code=400, detail="No valid URLs provided")
 
-        # Process news articles with error handling
         try:
-            # Initialize documents list
             documents = []
             loader = UnstructuredURLLoader(urls=valid_urls)
             documents.extend(loader.load())
@@ -213,15 +206,13 @@ async def analyze_news(request: NewsRequest):
             if not documents:
                 raise HTTPException(status_code=400, detail="No content could be extracted from the provided URLs")
             
-            # Split documents
             text_splitter = RecursiveCharacterTextSplitter(
-                separators=['\n\n', '\n', '.', ','],  # Updated separators
-                chunk_size=1000,  # Increased chunk size
+                separators=['\n\n', '\n', '.', ','],  
+                chunk_size=1000,  
                 chunk_overlap=100
             )
             docs = text_splitter.split_documents(documents)
             
-            # Create embeddings with error handling
             embeddings = GoogleGenerativeAIEmbeddings(
                 model="models/embedding-001",
                 google_api_key=GOOGLE_API_KEY
@@ -229,7 +220,6 @@ async def analyze_news(request: NewsRequest):
             vectorstore = FAISS.from_documents(docs, embeddings)
             
             if request.query:
-                # News analysis prompt template (matching app.py)
                 news_template = """You are a financial news analyst. Analyze the provided news articles and answer the question.
                 Focus on extracting key information, trends, and implications from the news.
                 
@@ -264,7 +254,6 @@ async def analyze_news(request: NewsRequest):
                 
                 result = chain.invoke({"query": request.query})
                 
-                # Format response
                 return {
                     "result": result["result"],
                     "sources": [
@@ -289,7 +278,6 @@ async def analyze_news(request: NewsRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     
     
-# Query templates for financial report analysis
 query_templates = {
     "Financial Metrics Analysis": {
         "template": """Analyze the following financial metrics:
@@ -350,7 +338,6 @@ query_templates = {
     }
 }
 
-# Function to get analysis prompt based on analysis type
 def get_analysis_prompt(analysis_type):
     base_template = """You are a financial expert specialized in {analysis_type}. 
     Analyze the provided information and give a detailed response.
@@ -444,14 +431,12 @@ async def upload_financial_reports(files: List[UploadFile] = File(...)):
             documents.extend(loader.load())
             os.remove(temp_path)
 
-        # Split documents
         text_splitter = RecursiveCharacterTextSplitter(
             separators=['\n\n', '\n', '.', ','],
             chunk_size=1000
         )
         docs = text_splitter.split_documents(documents)
 
-        # Create embeddings
         embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         vectorstore_finance = FAISS.from_documents(docs, embeddings)
         vectorstore_finance.save_local("faiss_store_finance")
@@ -494,10 +479,8 @@ async def analyze_financial_reports(request: AnalysisRequest):
 @app.post("/api/chat")
 async def chat_with_advisor(request: ChatRequest):
     try:
-        # Calculate metrics
         metrics = calculate_financial_metrics(request.financial_data)
         
-        # Generate advice using the existing function
         response = generate_financial_advice(metrics, request.financial_data, request.query)
         
         return {"response": response}
@@ -505,23 +488,17 @@ async def chat_with_advisor(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# API endpoints for Stock Financial Advisor
 @app.post("/api/stock/analysis")
 async def analyze_stock(request: StockRequest):
     try:
-        # Fetch stock data
         stock = yf.Ticker(request.symbol)
         
-        # Get latest price
         latest_price = fetch_latest_price(request.symbol)
         
-        # Get historical data
         historical_data = fetch_historical_data(request.symbol)
         
-        # Get fundamentals
         fundamentals = fetch_fundamentals(request.symbol)
         
-        # Generate recommendation
         recommendation = generate_stock_recommendation(
             fundamentals,
             latest_price,
@@ -540,7 +517,6 @@ async def analyze_stock(request: StockRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Helper functions (moved from app.py)
 def calculate_financial_metrics(data: FinancialData):
     total_expenses = sum(data.expenses.values())
     total_investments = sum(data.investments.values())
@@ -574,17 +550,16 @@ def fetch_fundamentals(symbol):
 def generate_stock_recommendation(fundamentals, current_price, previous_price, trend_change):
         recommendation = ""
         reasons = []
-        overall_sentiment = "neutral"  # Initialize overall sentiment
+        overall_sentiment = "neutral"  
 
-        # Price-to-Earnings (PE) Ratio
         pe_ratio = fundamentals.get('PE Ratio', 'N/A')
         if pe_ratio != 'N/A':
             if pe_ratio > 25:
                 reasons.append(f"The current PE ratio of {pe_ratio} suggests that the stock is overvalued.")
-                overall_sentiment = "sell"  # Overvalued suggests selling
+                overall_sentiment = "sell"  
             elif pe_ratio < 15:
                 reasons.append(f"The current PE ratio of {pe_ratio} indicates that the stock is undervalued.")
-                overall_sentiment = "buy"  # Undervalued suggests buying
+                overall_sentiment = "buy"  
             else:
                 reasons.append(f"The current PE ratio of {pe_ratio} indicates that the stock is fairly valued.")
 
@@ -593,22 +568,21 @@ def generate_stock_recommendation(fundamentals, current_price, previous_price, t
         if dividend_yield != 'N/A':
             if dividend_yield < 0.02:
                 reasons.append(f"With a dividend yield of {dividend_yield:.2%}, the stock offers low returns on dividends.")
-                overall_sentiment = "hold"  # Low yield suggests holding
+                overall_sentiment = "hold" 
             elif dividend_yield > 0.05:
                 reasons.append(f"A dividend yield of {dividend_yield:.2%} indicates strong income potential.")
-                overall_sentiment = "buy"  # High yield suggests buying
+                overall_sentiment = "buy"  
             else:
                 reasons.append(f"A dividend yield of {dividend_yield:.2%} is moderate.")
 
-        # Debt-to-Equity Ratio
         debt_to_equity = fundamentals.get('Debt-to-Equity Ratio', 'N/A')
         if debt_to_equity != 'N/A':
             if debt_to_equity > 1:
                 reasons.append(f"The debt-to-equity ratio of {debt_to_equity} suggests high leverage, increasing financial risk.")
-                overall_sentiment = "sell"  # High debt suggests selling
+                overall_sentiment = "sell"  
             elif debt_to_equity < 0.5:
                 reasons.append(f"With a debt-to-equity ratio of {debt_to_equity}, the company is in a strong financial position.")
-                overall_sentiment = "buy"  # Low debt suggests buying
+                overall_sentiment = "buy"  
             else:
                 reasons.append(f"The debt-to-equity ratio of {debt_to_equity} indicates moderate leverage.")
 
@@ -617,10 +591,10 @@ def generate_stock_recommendation(fundamentals, current_price, previous_price, t
         if return_on_equity != 'N/A':
             if return_on_equity < 0:
                 reasons.append("The negative return on equity indicates that the company is not generating profit from its equity.")
-                overall_sentiment = "sell"  # Negative ROE suggests selling
+                overall_sentiment = "sell"  
             elif return_on_equity > 15:
                 reasons.append(f"An ROE of {return_on_equity}% reflects strong profitability.")
-                overall_sentiment = "buy"  # Strong ROE suggests buying
+                overall_sentiment = "buy" 
             else:
                 reasons.append(f"An ROE of {return_on_equity}% indicates moderate profitability.")
 
@@ -629,35 +603,32 @@ def generate_stock_recommendation(fundamentals, current_price, previous_price, t
         if profit_margin != 'N/A':
             if profit_margin < 0:
                 reasons.append("A negative profit margin indicates that the company is losing money on its sales.")
-                overall_sentiment = "sell"  # Negative margin suggests selling
+                overall_sentiment = "sell"  
             elif profit_margin > 0.2:
                 reasons.append(f"A profit margin of {profit_margin:.2%} suggests strong financial health.")
-                overall_sentiment = "buy"  # High margin suggests buying
+                overall_sentiment = "buy"  
             else:
                 reasons.append(f"A profit margin of {profit_margin:.2%} indicates moderate profitability.")
 
-        # Current Price vs Previous Price
         if current_price and previous_price:
             price_change = ((current_price - previous_price) / previous_price) * 100
             if price_change > 5:
                 reasons.append(f"The stock has increased by {price_change:.2f}%, reflecting positive investor sentiment.")
                 if overall_sentiment == "neutral":
-                    overall_sentiment = "hold"  # Positive change suggests holding
+                    overall_sentiment = "hold"  
             elif price_change < -5:
                 reasons.append(f"The stock has decreased by {price_change:.2f}%, which may suggest negative market sentiment.")
-                overall_sentiment = "sell"  # Negative change suggests selling
+                overall_sentiment = "sell"  
 
-        # Trend Analysis
         if trend_change > 0:
             reasons.append("A positive trend indicates potential growth, making it a favorable investment.")
             if overall_sentiment == "neutral":
-                overall_sentiment = "buy"  # Positive trend suggests buying
+                overall_sentiment = "buy"  
         elif trend_change < 0:
             reasons.append("A negative trend suggests caution, as it may indicate underlying issues with the company.")
             if overall_sentiment == "neutral":
-                overall_sentiment = "sell"  # Negative trend suggests selling
+                overall_sentiment = "sell"  
 
-        # Final Recommendation
         if overall_sentiment == "buy":
             recommendation = "Overall, the stock is a good buy based on the analysis of its fundamentals and market trends."
         elif overall_sentiment == "sell":
