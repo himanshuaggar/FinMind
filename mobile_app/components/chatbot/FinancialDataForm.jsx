@@ -1,31 +1,23 @@
-import { useState } from 'react';
-import { View, ScrollView, StyleSheet, Text, Dimensions } from 'react-native';
-import Input from '../common/Input';
-import Button from '../common/Button';
-import { COLORS, SIZES } from '../../constants/theme';
-import { FinancialData } from '../../types';
+import { useState } from "react";
+import { View, ScrollView, StyleSheet, Text, Dimensions } from "react-native";
+import Input from "../common/Input";
+import Button from "../common/Button";
+import { COLORS, SIZES } from "../../constants/theme";
 
-interface FinancialDataFormProps {
-  onSubmit: (data: FinancialData) => void;
-  initialData?: FinancialData;
-}
-
-// Helper function to safely convert to string
-const safeToString = (value: any): string => {
-  if (value === undefined || value === null) return '0';
+const safeToString = (value) => {
+  if (value === undefined || value === null) return "0";
   return value.toString();
 };
 
-// Helper function to parse number safely
-const parseNumber = (value: any): number => {
+const parseNumber = (value) => {
   if (value === undefined || value === null) return 0;
-  const num = Number(value.toString().replace(/[^0-9.-]/g, ''));
+  const num = Number(value.toString().replace(/[^0-9.-]/g, ""));
   return isNaN(num) ? 0 : num;
 };
 
-export default function FinancialDataForm({ onSubmit, initialData }: FinancialDataFormProps) {
+export default function FinancialDataForm({ onSubmit, initialData }) {
   // Default initial state with all required fields
-  const defaultData: FinancialData = {
+  const defaultData = {
     income: 0,
     expenses: {
       Housing: 0,
@@ -33,53 +25,52 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
       Transportation: 0,
       Utilities: 0,
       Entertainment: 0,
-      Other: 0
+      Other: 0,
     },
     savings: 0,
     investments: {
       Stocks: 0,
-      'Mutual Funds': 0,
-      'Fixed Deposits': 0,
-      'Real Estate': 0,
-      Other: 0
+      "Mutual Funds": 0,
+      "Fixed Deposits": 0,
+      "Real Estate": 0,
+      Other: 0,
     },
     debts: {
-      'Home Loan': 0,
-      'Car Loan': 0,
-      'Personal Loan': 0,
-      'Credit Card': 0,
-      'Other Debts': 0
+      "Home Loan": 0,
+      "Car Loan": 0,
+      "Personal Loan": 0,
+      "Credit Card": 0,
+      "Other Debts": 0,
     },
-    goals: []
+    goals: [],
   };
 
-  // Initialize state with merged data
-  const [financialData, setFinancialData] = useState<FinancialData>({
+  const [financialData, setFinancialData] = useState({
     ...defaultData,
-    ...initialData
+    ...initialData,
   });
 
-  const [newGoal, setNewGoal] = useState('');
+  const [newGoal, setNewGoal] = useState("");
 
   const handleAddGoal = () => {
     if (newGoal.trim()) {
-      setFinancialData(prev => ({
+      setFinancialData((prev) => ({
         ...prev,
-        goals: [...(prev.goals || []), newGoal.trim()]
+        goals: [...(prev.goals || []), newGoal.trim()],
       }));
-      setNewGoal('');
+      setNewGoal("");
     }
   };
 
-  const handleRemoveGoal = (index: number) => {
-    setFinancialData(prev => ({
+  const handleRemoveGoal = (index) => {
+    setFinancialData((prev) => ({
       ...prev,
-      goals: prev.goals.filter((_, i) => i !== index)
+      goals: prev.goals.filter((_, i) => i !== index),
     }));
   };
 
   const handleSubmit = () => {
-    const validatedData: FinancialData = {
+    const validatedData = {
       income: parseNumber(financialData.income),
       expenses: {
         Housing: parseNumber(financialData.expenses?.Housing),
@@ -87,24 +78,28 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
         Transportation: parseNumber(financialData.expenses?.Transportation),
         Utilities: parseNumber(financialData.expenses?.Utilities),
         Entertainment: parseNumber(financialData.expenses?.Entertainment),
-        Other: parseNumber(financialData.expenses?.Other)
+        Other: parseNumber(financialData.expenses?.Other),
       },
       savings: parseNumber(financialData.savings),
       investments: {
         Stocks: parseNumber(financialData.investments?.Stocks),
-        'Mutual Funds': parseNumber(financialData.investments?.['Mutual Funds']),
-        'Fixed Deposits': parseNumber(financialData.investments?.['Fixed Deposits']),
-        'Real Estate': parseNumber(financialData.investments?.['Real Estate']),
-        Other: parseNumber(financialData.investments?.Other)
+        "Mutual Funds": parseNumber(
+          financialData.investments?.["Mutual Funds"]
+        ),
+        "Fixed Deposits": parseNumber(
+          financialData.investments?.["Fixed Deposits"]
+        ),
+        "Real Estate": parseNumber(financialData.investments?.["Real Estate"]),
+        Other: parseNumber(financialData.investments?.Other),
       },
       debts: {
-        'Home Loan': parseNumber(financialData.debts?.['Home Loan']),
-        'Car Loan': parseNumber(financialData.debts?.['Car Loan']),
-        'Personal Loan': parseNumber(financialData.debts?.['Personal Loan']),
-        'Credit Card': parseNumber(financialData.debts?.['Credit Card']),
-        'Other Debts': parseNumber(financialData.debts?.['Other Debts'])
+        "Home Loan": parseNumber(financialData.debts?.["Home Loan"]),
+        "Car Loan": parseNumber(financialData.debts?.["Car Loan"]),
+        "Personal Loan": parseNumber(financialData.debts?.["Personal Loan"]),
+        "Credit Card": parseNumber(financialData.debts?.["Credit Card"]),
+        "Other Debts": parseNumber(financialData.debts?.["Other Debts"]),
       },
-      goals: financialData.goals || []
+      goals: financialData.goals || [],
     };
 
     onSubmit(validatedData);
@@ -120,10 +115,12 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
         <Input
           label="Monthly Income (₹)"
           value={safeToString(financialData.income)}
-          onChangeText={(value) => setFinancialData(prev => ({
-            ...prev,
-            income: parseNumber(value)
-          }))}
+          onChangeText={(value) =>
+            setFinancialData((prev) => ({
+              ...prev,
+              income: parseNumber(value),
+            }))
+          }
           keyboardType="numeric"
         />
       </View>
@@ -136,13 +133,15 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
             key={key}
             label={`${key} (₹)`}
             value={safeToString(financialData.expenses?.[key])}
-            onChangeText={(value) => setFinancialData(prev => ({
-              ...prev,
-              expenses: {
-                ...prev.expenses,
-                [key]: parseNumber(value)
-              }
-            }))}
+            onChangeText={(value) =>
+              setFinancialData((prev) => ({
+                ...prev,
+                expenses: {
+                  ...prev.expenses,
+                  [key]: parseNumber(value),
+                },
+              }))
+            }
             keyboardType="numeric"
           />
         ))}
@@ -156,13 +155,15 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
             key={key}
             label={`${key} (₹)`}
             value={safeToString(financialData.investments?.[key])}
-            onChangeText={(value) => setFinancialData(prev => ({
-              ...prev,
-              investments: {
-                ...prev.investments,
-                [key]: parseNumber(value)
-              }
-            }))}
+            onChangeText={(value) =>
+              setFinancialData((prev) => ({
+                ...prev,
+                investments: {
+                  ...prev.investments,
+                  [key]: parseNumber(value),
+                },
+              }))
+            }
             keyboardType="numeric"
           />
         ))}
@@ -176,13 +177,15 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
             key={key}
             label={`${key} (₹)`}
             value={safeToString(financialData.debts?.[key])}
-            onChangeText={(value) => setFinancialData(prev => ({
-              ...prev,
-              debts: {
-                ...prev.debts,
-                [key]: parseNumber(value)
-              }
-            }))}
+            onChangeText={(value) =>
+              setFinancialData((prev) => ({
+                ...prev,
+                debts: {
+                  ...prev.debts,
+                  [key]: parseNumber(value),
+                },
+              }))
+            }
             keyboardType="numeric"
           />
         ))}
@@ -195,29 +198,29 @@ export default function FinancialDataForm({ onSubmit, initialData }: FinancialDa
           <Input
             label="Add a financial goal"
             value={newGoal}
-            style={{ width: '100%', minWidth: Dimensions.get('window').width - 100 }}
+            style={{
+              width: "100%",
+              minWidth: Dimensions.get("window").width - 100,
+            }}
             onChangeText={setNewGoal}
             onSubmitEditing={handleAddGoal}
           />
-          <Button title="Add" onPress={handleAddGoal} variant='primary' />
+          <Button title="Add" onPress={handleAddGoal} variant="primary" />
         </View>
         {(financialData.goals || []).map((goal, index) => (
           <View key={index} style={styles.goalItem}>
             <Text style={styles.goalText}>{goal}</Text>
-            <Button 
-              title="Remove" 
+            <Button
+              title="Remove"
               onPress={() => handleRemoveGoal(index)}
-              variant='secondary'
+              variant="secondary"
             />
           </View>
         ))}
       </View>
 
       <View style={styles.submitButtonContainer}>
-        <Button 
-          title="Save Financial Data" 
-          onPress={handleSubmit}
-        />
+        <Button title="Save Financial Data" onPress={handleSubmit} />
       </View>
     </ScrollView>
   );
@@ -228,35 +231,35 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: SIZES.medium,
     backgroundColor: COLORS.background,
-    paddingBottom:SIZES.xxLarge,
+    paddingBottom: SIZES.xxLarge,
   },
   title: {
     fontSize: SIZES.xLarge,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: "bold",
+    color: "white",
     marginBottom: SIZES.large,
   },
   section: {
     marginBottom: SIZES.large,
-    color:'white',
+    color: "white",
   },
   sectionTitle: {
     fontSize: SIZES.large,
-    fontWeight: '600',
-    color: 'white',
+    fontWeight: "600",
+    color: "white",
     marginBottom: SIZES.small,
   },
   goalInput: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent:'space-between',
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: SIZES.small,
-    width:'100%',
+    width: "100%",
   },
   goalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: SIZES.small,
     backgroundColor: COLORS.cardBackground,
     borderRadius: SIZES.small,
@@ -266,9 +269,9 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.textPrimary,
     marginRight: SIZES.small,
-    width:'100%',
+    width: "100%",
   },
   submitButtonContainer: {
-    marginBottom:SIZES.xxLarge,
-  }
+    marginBottom: SIZES.xxLarge,
+  },
 });

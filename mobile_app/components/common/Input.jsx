@@ -1,21 +1,18 @@
-import { TextInput, View, Text, StyleSheet, TextInputProps } from 'react-native';
-import { COLORS, SIZES } from '../../constants/theme';
+import {
+  TextInput,
+  View,
+  Text,
+  StyleSheet,
+  TextInputProps,
+} from "react-native";
+import { COLORS, SIZES } from "../../constants/theme";
 
-interface InputProps extends TextInputProps {
-  label?: string;
-  error?: string;
-}
-
-export default function Input({ label, error, style, ...props }: InputProps) {
+export default function Input({ label, error, style, ...props }) {
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
       <TextInput
-        style={[
-          styles.input,
-          error && styles.inputError,
-          style
-        ]}
+        style={[styles.input, error && styles.inputError, style]}
         placeholderTextColor={COLORS.gray}
         {...props}
       />

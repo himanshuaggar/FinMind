@@ -1,17 +1,21 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZES } from '../../constants/theme';
-import { FinancialData } from '../../types';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { COLORS, SIZES } from "../../constants/theme";
 
-interface FinancialMetricsProps {
-  financialData: FinancialData;
-}
-
-export default function FinancialMetrics({ financialData }: FinancialMetricsProps) {
+export default function FinancialMetrics({ financialData }) {
   const calculateMetrics = () => {
-    const totalExpenses = Object.values(financialData.expenses).reduce((a, b) => a + b, 0);
-    const totalInvestments = Object.values(financialData.investments).reduce((a, b) => a + b, 0);
-    const totalDebts = Object.values(financialData.debts).reduce((a, b) => a + b, 0);
+    const totalExpenses = Object.values(financialData.expenses).reduce(
+      (a, b) => a + b,
+      0
+    );
+    const totalInvestments = Object.values(financialData.investments).reduce(
+      (a, b) => a + b,
+      0
+    );
+    const totalDebts = Object.values(financialData.debts).reduce(
+      (a, b) => a + b,
+      0
+    );
     const monthlySavings = financialData.income - totalExpenses;
     const savingsRate = (monthlySavings / financialData.income) * 100;
     const debtToIncome = (totalDebts / financialData.income) * 100;
@@ -22,7 +26,7 @@ export default function FinancialMetrics({ financialData }: FinancialMetricsProp
       totalDebts,
       monthlySavings,
       savingsRate,
-      debtToIncome
+      debtToIncome,
     };
   };
 
@@ -34,15 +38,21 @@ export default function FinancialMetrics({ financialData }: FinancialMetricsProp
       <View style={styles.metricsGrid}>
         <View style={styles.metricItem}>
           <Text style={styles.metricLabel}>Monthly Savings</Text>
-          <Text style={styles.metricValue}>₹{metrics.monthlySavings.toLocaleString()}</Text>
+          <Text style={styles.metricValue}>
+            ₹{metrics.monthlySavings.toLocaleString()}
+          </Text>
         </View>
         <View style={styles.metricItem}>
           <Text style={styles.metricLabel}>Savings Rate</Text>
-          <Text style={styles.metricValue}>{metrics.savingsRate.toFixed(1)}%</Text>
+          <Text style={styles.metricValue}>
+            {metrics.savingsRate.toFixed(1)}%
+          </Text>
         </View>
         <View style={styles.metricItem}>
           <Text style={styles.metricLabel}>Debt/Income</Text>
-          <Text style={styles.metricValue}>{metrics.debtToIncome.toFixed(1)}%</Text>
+          <Text style={styles.metricValue}>
+            {metrics.debtToIncome.toFixed(1)}%
+          </Text>
         </View>
       </View>
     </View>
@@ -63,17 +73,17 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: SIZES.large,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textPrimary,
     marginBottom: SIZES.medium,
   },
   metricsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   metricItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   metricLabel: {
     fontSize: SIZES.small,
@@ -82,7 +92,7 @@ const styles = StyleSheet.create({
   },
   metricValue: {
     fontSize: SIZES.medium,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.primary,
   },
 });

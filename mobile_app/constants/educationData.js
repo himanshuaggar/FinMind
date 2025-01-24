@@ -68,7 +68,7 @@ export const FINANCIAL_TERMS = [
         definition: 'Betting against a stock by selling borrowed shares.',
         contentUrl: 'https://www.investopedia.com/terms/s/shortselling.asp'
     }
-] as const;
+];
 
 export const MARKET_LESSONS = [
     {
@@ -143,7 +143,7 @@ export const MARKET_LESSONS = [
         imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=1000&auto=format&fit=crop',
         contentUrl: 'https://www.investopedia.com/articles/investing/051216/understanding-market-psychology.asp'
     }
-] as const;
+];
 
 export const ECONOMIC_INDICATORS = [
     {
@@ -202,7 +202,7 @@ export const ECONOMIC_INDICATORS = [
         trend: 'down',
         icon: 'home'
     }
-] as const;
+];
 
 export const INVESTMENT_IDEAS = [
     {
@@ -285,44 +285,4 @@ export const INVESTMENT_IDEAS = [
         timeHorizon: 'Long Term',
         contentUrl: 'https://www.investopedia.com/sustainable-investing-5189812'
     }
-] as const;
-
-export interface FinancialTip {
-    category: string;
-    title: string;
-    description: string;
-    icon: keyof typeof MaterialIcons.glyphMap;
-}
-
-export interface FinancialTerm {
-    term: string;
-    definition: string;
-    contentUrl: string;
-}
-
-export interface MarketLesson {
-    title: string;
-    category: string;
-    duration: number;
-    progress: number;
-    description: string;
-    imageUrl: string;
-    contentUrl: string;
-}
-
-export interface EconomicIndicator {
-    name: string;
-    value: string;
-    change: string;
-    trend: 'up' | 'down' | 'neutral';
-    icon: keyof typeof MaterialIcons.glyphMap;
-}
-
-export interface InvestmentIdea {
-    category: string;
-    title: string;
-    description: string;
-    riskLevel: 'Low' | 'Moderate' | 'High';
-    timeHorizon: 'Short Term' | 'Medium Term' | 'Long Term';
-    contentUrl: string;
-}
+];

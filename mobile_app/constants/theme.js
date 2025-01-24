@@ -2,12 +2,12 @@ export const COLORS = {
   primary: "#6C63FF",
   secondary: "#2A2D3E",
   tertiary: "#FF6B6B",
-  
+
   background: "#1F1D2B",
   cardBackground: "#252836",
   textPrimary: "#FFFFFF",
   textSecondary: "#B7B7B7",
-  
+
   gray: "#9CA3AF",
   gray2: "#4B5563",
 

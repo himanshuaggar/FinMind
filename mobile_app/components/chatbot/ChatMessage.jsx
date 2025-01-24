@@ -3,13 +3,7 @@ import { useEffect, useRef } from 'react';
 import RenderHtml from 'react-native-render-html';
 import { COLORS, SIZES } from '../../constants/theme';
 
-interface ChatMessageProps {
-  message: string;
-  isUser: boolean;
-  timestamp: Date;
-}
-
-export default function ChatMessage({ message, isUser, timestamp }: ChatMessageProps) {
+export default function ChatMessage({ message, isUser, timestamp }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const { width } = useWindowDimensions();

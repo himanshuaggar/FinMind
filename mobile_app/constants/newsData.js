@@ -6,7 +6,7 @@ export const NEWS_CATEGORIES = [
     { id: 'science', label: 'Science', icon: 'science' },
     { id: 'sports', label: 'Sports', icon: 'sports' },
     { id: 'entertainment', label: 'Entertainment', icon: 'movie' },
-] as const;
+];
 
 export const MOCK_NEWS = [
     {
@@ -25,5 +25,4 @@ export const MOCK_NEWS = [
             percentage: '+2.3%'
         }
     },
-    // Add more mock news items...
-] as const;
+];

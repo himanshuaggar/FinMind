@@ -1,43 +1,20 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS, SIZES } from "../../constants/theme";
-import { useEffect, useState } from 'react';
-import { getAIInsights } from '../../services/api';
+import { useEffect, useState } from "react";
+import { getAIInsights } from "../../services/api";
 
-interface MarketTrend {
-  direction: 'up' | 'down' | 'neutral';
-  percentage: number;
-  sector: string;
-  analysis: string;
-}
-
-interface MarketInsight {
-  category: string;
-  title: string;
-  description: string;
-  impact: 'positive' | 'negative' | 'neutral';
-  confidence: number;
-  icon: string;
-}
-
-interface MarketData {
-  topInsights: MarketInsight[];
-  marketTrends: MarketTrend[];
-  lastUpdated: string;
-  marketSummary: string;
-  tradingVolume: number;
-  volatilityIndex: number;
-}
-
-interface AIHighlightsProps {
-  onPress: () => void;
-}
-
-export default function AIHighlights({ onPress }: AIHighlightsProps) {
-  const [data, setData] = useState<MarketData | null>(null);
+export default function AIHighlights({ onPress }) {
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [error, setError] = useState(null);
+  const [refreshInterval, setRefreshInterval] = useState(null);
 
   const loadMarketData = async () => {
     try {
@@ -46,8 +23,8 @@ export default function AIHighlights({ onPress }: AIHighlightsProps) {
       const marketData = await getAIInsights();
       setData(marketData);
     } catch (err) {
-      setError('Failed to load market data. Please try again later.');
-      console.error('Error loading market data:', err);
+      setError("Failed to load market data. Please try again later.");
+      console.error("Error loading market data:", err);
     } finally {
       setLoading(false);
     }
@@ -55,7 +32,7 @@ export default function AIHighlights({ onPress }: AIHighlightsProps) {
 
   useEffect(() => {
     loadMarketData();
-    
+
     // Refresh data every 5 minutes
     const interval = setInterval(loadMarketData, 300000);
     setRefreshInterval(interval);
@@ -67,27 +44,36 @@ export default function AIHighlights({ onPress }: AIHighlightsProps) {
     };
   }, []);
 
-  const getTrendIcon = (direction: string) => {
+  const getTrendIcon = (direction) => {
     switch (direction) {
-      case 'up': return 'arrow-up';
-      case 'down': return 'arrow-down';
-      default: return 'minus';
+      case "up":
+        return "arrow-up";
+      case "down":
+        return "arrow-down";
+      default:
+        return "minus";
     }
   };
 
-  const getTrendColor = (direction: string) => {
+  const getTrendColor = (direction) => {
     switch (direction) {
-      case 'up': return COLORS.success;
-      case 'down': return COLORS.error;
-      default: return COLORS.textSecondary;
+      case "up":
+        return COLORS.success;
+      case "down":
+        return COLORS.error;
+      default:
+        return COLORS.textSecondary;
     }
   };
 
-  const getImpactColor = (impact: string) => {
+  const getImpactColor = (impact) => {
     switch (impact) {
-      case 'positive': return COLORS.success;
-      case 'negative': return COLORS.error;
-      default: return COLORS.textSecondary;
+      case "positive":
+        return COLORS.success;
+      case "negative":
+        return COLORS.error;
+      default:
+        return COLORS.textSecondary;
     }
   };
 
@@ -103,7 +89,11 @@ export default function AIHighlights({ onPress }: AIHighlightsProps) {
   if (error) {
     return (
       <View style={[styles.container, styles.errorContainer]}>
-        <FontAwesome5 name="exclamation-circle" size={24} color={COLORS.error} />
+        <FontAwesome5
+          name="exclamation-circle"
+          size={24}
+          color={COLORS.error}
+        />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={loadMarketData}>
           <Text style={styles.retryButtonText}>Retry</Text>
@@ -120,9 +110,7 @@ export default function AIHighlights({ onPress }: AIHighlightsProps) {
         <View style={styles.header}>
           <FontAwesome5 name="robot" size={24} color={COLORS.primary} />
           <Text style={styles.title}>AI Market Insights</Text>
-          {loading && (
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          )}
+          {loading && <ActivityIndicator size="small" color={COLORS.primary} />}
         </View>
 
         {/* Market Summary */}
@@ -138,15 +126,25 @@ export default function AIHighlights({ onPress }: AIHighlightsProps) {
             <View style={styles.metric}>
               <Text style={styles.metricLabel}>VIX</Text>
               <View style={styles.vixContainer}>
-                <Text style={[
-                  styles.metricValue,
-                  { color: data.volatilityIndex > 20 ? COLORS.error : COLORS.success }
-                ]}>
+                <Text
+                  style={[
+                    styles.metricValue,
+                    {
+                      color:
+                        data.volatilityIndex > 20
+                          ? COLORS.error
+                          : COLORS.success,
+                    },
+                  ]}
+                >
                   {data.volatilityIndex.toFixed(2)}
                 </Text>
                 <Text style={styles.vixLabel}>
-                  {data.volatilityIndex > 30 ? 'High' : 
-                   data.volatilityIndex > 20 ? 'Elevated' : 'Normal'}
+                  {data.volatilityIndex > 30
+                    ? "High"
+                    : data.volatilityIndex > 20
+                    ? "Elevated"
+                    : "Normal"}
                 </Text>
               </View>
             </View>
@@ -165,8 +163,14 @@ export default function AIHighlights({ onPress }: AIHighlightsProps) {
                   color={getTrendColor(trend.direction)}
                 />
                 <Text style={styles.sectorName}>{trend.sector}</Text>
-                <Text style={[styles.trendValue, { color: getTrendColor(trend.direction) }]}>
-                  {trend.direction === 'up' ? '+' : ''}{trend.percentage.toFixed(2)}%
+                <Text
+                  style={[
+                    styles.trendValue,
+                    { color: getTrendColor(trend.direction) },
+                  ]}
+                >
+                  {trend.direction === "up" ? "+" : ""}
+                  {trend.percentage.toFixed(2)}%
                 </Text>
               </View>
               <Text style={styles.trendAnalysis}>{trend.analysis}</Text>
@@ -186,14 +190,26 @@ export default function AIHighlights({ onPress }: AIHighlightsProps) {
                   color={COLORS.primary}
                 />
                 <Text style={styles.insightCategory}>{insight.category}</Text>
-                <View style={[styles.confidenceBadge, { backgroundColor: getImpactColor(insight.impact) + '20' }]}>
-                  <Text style={[styles.confidenceText, { color: getImpactColor(insight.impact) }]}>
+                <View
+                  style={[
+                    styles.confidenceBadge,
+                    { backgroundColor: getImpactColor(insight.impact) + "20" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.confidenceText,
+                      { color: getImpactColor(insight.impact) },
+                    ]}
+                  >
                     {insight.confidence}% confidence
                   </Text>
                 </View>
               </View>
               <Text style={styles.insightTitle}>{insight.title}</Text>
-              <Text style={styles.insightDescription}>{insight.description}</Text>
+              <Text style={styles.insightDescription}>
+                {insight.description}
+              </Text>
             </View>
           ))}
         </View>
@@ -216,8 +232,8 @@ const styles = StyleSheet.create({
     padding: SIZES.medium,
   },
   loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     minHeight: 200,
   },
   loadingText: {
@@ -225,14 +241,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   errorContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     minHeight: 200,
     gap: SIZES.small,
   },
   errorText: {
     color: COLORS.error,
-    textAlign: 'center',
+    textAlign: "center",
   },
   retryButton: {
     marginTop: SIZES.small,
@@ -242,24 +258,24 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: COLORS.white,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: SIZES.medium,
     gap: SIZES.small,
   },
   title: {
     flex: 1,
     fontSize: SIZES.large,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textPrimary,
   },
   summaryContainer: {
     marginBottom: SIZES.medium,
     padding: SIZES.small,
-    backgroundColor: COLORS.primary + '10',
+    backgroundColor: COLORS.primary + "10",
     borderRadius: SIZES.small,
   },
   summaryText: {
@@ -268,12 +284,12 @@ const styles = StyleSheet.create({
     lineHeight: SIZES.large * 1.2,
   },
   marketMetrics: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: SIZES.small,
   },
   metric: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   metricLabel: {
     fontSize: SIZES.small,
@@ -281,11 +297,11 @@ const styles = StyleSheet.create({
   },
   metricValue: {
     fontSize: SIZES.medium,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.primary,
   },
   vixContainer: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   vixLabel: {
     fontSize: SIZES.xSmall,
@@ -296,13 +312,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: SIZES.medium,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: SIZES.small,
   },
   trendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: SIZES.xSmall,
     gap: SIZES.small,
   },
@@ -313,7 +329,7 @@ const styles = StyleSheet.create({
   },
   trendValue: {
     fontSize: SIZES.medium,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   trendAnalysis: {
     fontSize: SIZES.small,
@@ -328,8 +344,8 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.small,
   },
   insightHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: SIZES.xSmall,
     gap: SIZES.small,
   },
@@ -339,7 +355,7 @@ const styles = StyleSheet.create({
   },
   insightTitle: {
     fontSize: SIZES.medium,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: SIZES.xSmall,
   },
@@ -347,11 +363,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.small,
     paddingVertical: SIZES.xSmall / 2,
     borderRadius: SIZES.small,
-    marginLeft: 'auto',
+    marginLeft: "auto",
   },
   confidenceText: {
     fontSize: SIZES.small,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   insightDescription: {
     fontSize: SIZES.small,
@@ -359,9 +375,9 @@ const styles = StyleSheet.create({
     lineHeight: SIZES.medium * 1.2,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   lastUpdated: {
     fontSize: SIZES.small,

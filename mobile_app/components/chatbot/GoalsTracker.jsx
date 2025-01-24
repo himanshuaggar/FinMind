@@ -1,18 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import * as Progress from 'react-native-progress';
-import { getUserGoals } from '../../services/api';
-import Loading from '../common/Loading';
+import * as Progress from "react-native-progress";
+import { getUserGoals } from "../../services/api";
+import Loading from "../common/Loading";
 import { COLORS, SIZES } from "../../constants/theme";
 
-interface Goal {
-  name: string;
-  target: number;
-  current: number;
-}
-
 export default function GoalsTracker() {
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,7 +18,7 @@ export default function GoalsTracker() {
       const data = await getUserGoals();
       setGoals(data);
     } catch (error) {
-      console.error('Error fetching goals:', error);
+      console.error("Error fetching goals:", error);
     } finally {
       setLoading(false);
     }
@@ -80,7 +74,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: SIZES.large,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.secondary,
     marginBottom: SIZES.medium,
   },
@@ -88,14 +82,14 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.medium,
   },
   goalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: SIZES.small / 2,
   },
   goalName: {
     fontSize: SIZES.medium,
-    fontWeight: '500',
+    fontWeight: "500",
     color: COLORS.secondary,
   },
   goalProgress: {
@@ -103,13 +97,13 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
   },
   progressBar: {
-    width: '100%',
+    width: "100%",
     marginVertical: SIZES.small / 2,
   },
   percentageText: {
     fontSize: SIZES.small,
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: "right",
     marginTop: 2,
   },
 });

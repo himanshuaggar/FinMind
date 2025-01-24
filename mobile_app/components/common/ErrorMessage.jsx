@@ -1,13 +1,8 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { FontAwesome5 } from '@expo/vector-icons';
-import { COLORS, SIZES } from '../../constants/theme';
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { COLORS, SIZES } from "../../constants/theme";
 
-interface ErrorMessageProps {
-  message: string;
-  onRetry?: () => void;
-}
-
-export default function ErrorMessage({ message, onRetry }: ErrorMessageProps) {
+export default function ErrorMessage({ message, onRetry }) {
   return (
     <View style={styles.container}>
       <FontAwesome5 name="exclamation-circle" size={48} color={COLORS.error} />
@@ -24,12 +19,12 @@ export default function ErrorMessage({ message, onRetry }: ErrorMessageProps) {
 const styles = StyleSheet.create({
   container: {
     padding: SIZES.medium,
-    alignItems: 'center',
+    alignItems: "center",
   },
   message: {
     color: COLORS.textPrimary,
     fontSize: SIZES.medium,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: SIZES.small,
   },
   retryButton: {

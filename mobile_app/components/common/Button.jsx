@@ -1,28 +1,21 @@
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS, SIZES } from '../../constants/theme';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
+import { COLORS, SIZES } from "../../constants/theme";
 
-interface ButtonProps {
-  title: string;
-  onPress: () => void;
-  loading?: boolean;
-  variant?: 'primary' | 'secondary';
-  disabled?: boolean;
-}
-
-export default function Button({ 
-  title, 
-  onPress, 
-  loading = false, 
-  variant = 'primary',
-  disabled = false 
-}: ButtonProps) {
+export default function Button({
+  title,
+  onPress,
+  loading = false,
+  variant = "primary",
+  disabled = false,
+}) {
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        styles[variant],
-        disabled && styles.disabled
-      ]}
+      style={[styles.button, styles[variant], disabled && styles.disabled]}
       onPress={onPress}
       disabled={disabled || loading}
     >
@@ -39,8 +32,8 @@ const styles = StyleSheet.create({
   button: {
     padding: SIZES.small,
     borderRadius: SIZES.small,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     margin: SIZES.medium,
   },
   primary: {
@@ -55,6 +48,6 @@ const styles = StyleSheet.create({
   text: {
     color: COLORS.white,
     fontSize: SIZES.medium,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });

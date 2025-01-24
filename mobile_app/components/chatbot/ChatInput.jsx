@@ -10,13 +10,8 @@ import {
 import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
 
-interface ChatInputProps {
-  onSend: (message: string) => void;
-  disabled: boolean;
-  placeholder?: string;
-}
 
-export default function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder }) {
   const [message, setMessage] = useState('');
 
   const handleSend = () => {

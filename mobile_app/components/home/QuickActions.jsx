@@ -5,7 +5,7 @@ import { COLORS, SIZES, SHADOWS } from "../../constants/theme";
 
 export default function QuickActions() {
   const router = useRouter();
-  
+
   const actions = [
     { icon: "exchange-alt", label: "Transfer", route: "/transfer" },
     { icon: "piggy-bank", label: "Save", route: "/savings" },
@@ -18,13 +18,17 @@ export default function QuickActions() {
       <Text style={styles.title}>Quick Actions</Text>
       <View style={styles.actionsGrid}>
         {actions.map((action, index) => (
-          <TouchableOpacity 
+          <TouchableOpacity
             key={index}
             style={styles.actionItem}
             onPress={() => {}}
           >
             <View style={styles.iconContainer}>
-              <FontAwesome5 name={action.icon} size={24} color={COLORS.primary} />
+              <FontAwesome5
+                name={action.icon}
+                size={24}
+                color={COLORS.primary}
+              />
             </View>
             <Text style={styles.actionLabel}>{action.label}</Text>
           </TouchableOpacity>
