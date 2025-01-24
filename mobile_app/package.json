@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.3.11",
+    "@clerk/types": "^4.42.0",
     "@expo/metro-runtime": "~4.0.0",
     "@expo/vector-icons": "^14.0.2",
     "@neondatabase/serverless": "^0.10.4",

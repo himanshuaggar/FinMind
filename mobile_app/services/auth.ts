@@ -2,6 +2,15 @@ import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import { useAuth } from "@clerk/clerk-expo";
 import { fetchAPI } from "./fetch";
+import { SignIn } from '@clerk/types';
+
+
+interface OAuthResponse {
+    createdSessionId: string | null;
+    signIn?: SignIn;
+    signUp?: any;
+    setActive: (params: { session: string }) => Promise<void>;
+}
 
 export const tokenCache = {
     async getToken(key: string) {
@@ -29,21 +38,34 @@ export const tokenCache = {
     },
 };
 
-export const googleOAuth = async (startOAuthFlow: any) => {
+export const googleOAuth = async (startOAuthFlow: () => Promise<OAuthResponse>) => {
     try {
+        const existingToken = await tokenCache.getToken('__clerk_client_jwt');
+        if (existingToken) {
+            await tokenCache.saveToken('__clerk_client_jwt', '');
+        }
+
         const { createdSessionId, signIn, signUp } = await startOAuthFlow();
-        
+
         if (createdSessionId) {
+            // Save the new session token immediately
+            await tokenCache.saveToken('__clerk_client_jwt', createdSessionId);
+
             if (signUp?.createdUserId) {
-                await fetchAPI("/api/user", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        name: `${signUp.firstName} ${signUp.lastName}`,
-                        email: signUp.emailAddress,
-                        clerkId: signUp.createdUserId,
-                    }),
-                });
+                try {
+                    await fetchAPI("/api/user", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            name: `${signUp.firstName} ${signUp.lastName}`,
+                            email: signUp.emailAddress,
+                            clerkId: signUp.createdUserId,
+                        }),
+                    });
+                } catch (error) {
+                    console.error("Error creating user profile:", error);
+                }
             }
+            await setActive({ session: createdSessionId });
 
             return {
                 success: true,

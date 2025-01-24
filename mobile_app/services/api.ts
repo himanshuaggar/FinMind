@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, API_ENDPOINTS, EXTERNAL_APIS } from '../constants/api';
 import { storage } from './storage';
-import { Portfolio, WatchlistItem, Goal, MarketSentiment } from '../types';
+import { Portfolio, WatchlistItem, Goal, MarketSentiment, AnalysisResponse } from '../types';
 import { NewsItem, NewsCategory } from '../types/news';
 
 const api = axios.create({
@@ -14,13 +14,18 @@ const api = axios.create({
   },
 });
 
+interface AnalysisRequest {
+  analysis_type: string;
+  question: string;
+}
+
 api.interceptors.request.use(
   async (config) => {
     try {
       const lastHealthCheck = await storage.get('last_health_check');
       const now = Date.now();
 
-      if (!lastHealthCheck || (now - Number(lastHealthCheck)) > 300000) { 
+      if (!lastHealthCheck || (now - Number(lastHealthCheck)) > 300000) {
         const isHealthy = await checkAPIHealth();
         if (!isHealthy) {
           console.warn('API health check failed');
@@ -28,7 +33,6 @@ api.interceptors.request.use(
         await storage.set('last_health_check', now.toString());
       }
 
-      // Add auth token if available
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -44,14 +48,11 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized access
       await AsyncStorage.removeItem('authToken');
-      // Redirect to login
     }
     return Promise.reject(error);
   }
@@ -105,17 +106,40 @@ export const analyzeNews = async (urls: string[], query?: string) => {
   }
 };
 
-export const analyzeFinancialReports = async (formData: FormData) => {
+export const uploadFinancialReports = async (files: FormData): Promise<{ message: string }> => {
   try {
-    const response = await api.post(API_ENDPOINTS.FINANCIAL_REPORTS, formData, {
+    console.log('Making upload request with files:', files);
+    const response = await api.post(API_ENDPOINTS.UPLOAD_FINANCIAL_REPORTS, files, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 300000,
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total!);
+        console.log('Upload progress:', percentCompleted);
+      }
     });
+    console.log('Upload response:', response.data);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Error uploading reports:', error);
+    throw new Error(error.response?.data?.detail || 'Failed to upload reports');
+  }
+};
+
+export const analyzeFinancialReports = async (request: {
+  analysis_type: string;
+  question: string;
+}): Promise<{
+  result: string;
+  sources: string[];
+}> => {
+  try {
+    const response = await api.post(API_ENDPOINTS.ANALYZE_FINANCIAL_REPORTS, request);
+    return response.data;
+  } catch (error: any) {
     console.error('Error analyzing reports:', error);
-    throw error;
+    throw new Error(error.response?.data?.detail || 'Failed to analyze reports');
   }
 };
 
@@ -184,17 +208,14 @@ function isValidFinancialData(data: any): boolean {
     return false;
   }
 
-  // Check investments object
   if (!isValidNumberObject(data.investments)) {
     return false;
   }
 
-  // Check debts object
   if (!isValidNumberObject(data.debts)) {
     return false;
   }
 
-  // Check goals array
   if (!Array.isArray(data.goals)) {
     return false;
   }
@@ -202,7 +223,6 @@ function isValidFinancialData(data: any): boolean {
   return true;
 }
 
-// Helper function to validate objects with number values
 function isValidNumberObject(obj: any): boolean {
   if (typeof obj !== 'object' || obj === null) {
     return false;
@@ -220,16 +240,13 @@ export const analyzeStock = async (symbol: string) => {
 
 export const getMarketOverview = async () => {
   try {
-    // Try to get cached data first
     const cachedData = await storage.get('marketOverview');
     const cacheTime = await storage.get('marketOverviewTime');
 
-    // Use cache if it's less than 5 minutes old
     if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 300000) {
       return cachedData;
     }
 
-    // Default mock data (will be used if API fails)
     const defaultData = {
       nifty: {
         value: 19500,
@@ -265,7 +282,6 @@ export const getMarketOverview = async () => {
       }
     };
 
-    // Fetch data for all three indices
     const indices = await Promise.all([
       axios.get('https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI'),
       axios.get('https://query1.finance.yahoo.com/v8/finance/chart/%5EBSESN'),
@@ -288,7 +304,6 @@ export const getMarketOverview = async () => {
       bankNifty: formatIndexData(bankNiftyResponse) || defaultData.bankNifty
     };
 
-    // Cache the new data
     await storage.set('marketOverview', marketData);
     await storage.set('marketOverviewTime', Date.now().toString());
 
@@ -335,16 +350,13 @@ export const updateUserGoals = async (userId: string, goals: Goal[]): Promise<Go
 
 export const getMarketSentiment = async (): Promise<MarketSentiment> => {
   try {
-    // Try to get cached data first
     const cachedData = await storage.get<MarketSentiment>('market_sentiment');
     const cacheTime = await storage.get('market_sentiment_time');
 
-    // Use cache if it's less than 15 minutes old
     if (cachedData && cacheTime && (Date.now() - Number(cacheTime)) < 900000) {
       return cachedData;
     }
 
-    // Get market data from Yahoo Finance
     const [niftyResponse, newsResponse] = await Promise.all([
       axios.get('https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI', {
         params: {
@@ -359,11 +371,9 @@ export const getMarketSentiment = async (): Promise<MarketSentiment> => {
       throw new Error('Failed to fetch market data');
     });
 
-    // Calculate technical indicators from price data
     const prices = niftyResponse.data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
     const technicalScore = calculateTechnicalIndicators(prices);
 
-    // Calculate sentiment from recent price movements
     const recentPrices = prices.slice(-5);
     const priceMovement = recentPrices.length > 1 ?
       (recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentPrices[0] * 100 : 0;
@@ -401,7 +411,6 @@ export const getMarketSentiment = async (): Promise<MarketSentiment> => {
       lastUpdated: new Date().toISOString()
     };
 
-    // Cache the new sentiment data
     await storage.set('market_sentiment', sentiment);
     await storage.set('market_sentiment_time', Date.now().toString());
 
@@ -415,7 +424,6 @@ export const getMarketSentiment = async (): Promise<MarketSentiment> => {
       return cachedSentiment;
     }
 
-    // Return mock data if everything fails
     return {
       overall: 55,
       bullish: 55,
@@ -442,7 +450,6 @@ export const getMarketSentiment = async (): Promise<MarketSentiment> => {
   }
 };
 
-// Helper function to calculate technical indicators
 function calculateTechnicalIndicators(prices: number[]): number {
   if (!prices || prices.length < 20) return 50;
 
@@ -462,15 +469,12 @@ function calculateTechnicalIndicators(prices: number[]): number {
   return technicalScore;
 }
 
-// Helper functions for sentiment calculation
 function calculateOverallSentiment(newsSentiment: any, technicalAnalysis: any): number {
-  // Implement your sentiment calculation logic here
   return (newsSentiment.sentiment * 0.6 + calculateTechnicalScore(technicalAnalysis) * 0.4);
 }
 
 function calculateTechnicalScore(technicalAnalysis: any): number {
-  // Implement your technical analysis score calculation here
-  return 0.5; // Placeholder
+  return 0.5;
 }
 
 function determineSignal(value: number): 'bullish' | 'bearish' | 'neutral' {
@@ -479,20 +483,9 @@ function determineSignal(value: number): 'bullish' | 'bearish' | 'neutral' {
   return 'neutral';
 }
 
-// Add helper functions for technical analysis
 function calculateSMA(prices: number[], period: number): number {
   const slice = prices.slice(-period);
   return slice.reduce((a, b) => a + b, 0) / period;
-}
-
-function calculateRSI(prices: number[], period: number): number {
-  // Implement RSI calculation
-  return 50; // Placeholder
-}
-
-function calculateMACD(prices: number[]): number {
-  // Implement MACD calculation
-  return 0; // Placeholder
 }
 
 export const getStockChartData = async (symbol: string, range: '1D' | '1W' | '1M' | '3M' | '1Y' = '1M') => {

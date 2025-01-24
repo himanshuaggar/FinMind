@@ -2,7 +2,8 @@ export const API_URL = 'https://finmind.onrender.com';
 
 export const API_ENDPOINTS = {
   NEWS_ANALYSIS: '/api/analyze-news',
-  FINANCIAL_REPORTS: '/api/analyze-financial-reports',
+  UPLOAD_FINANCIAL_REPORTS: '/api/upload-financial-reports/',
+  ANALYZE_FINANCIAL_REPORTS: '/api/analyze-financial-reports/',
   CHAT: '/api/chat',
   STOCK_ANALYSIS: '/api/stock/analysis',
   PORTFOLIO: '/api/portfolio',

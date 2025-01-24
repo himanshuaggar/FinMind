@@ -10,6 +10,16 @@ declare global {
         }
     }
 }
+export interface AnalysisResponse {
+    result?: string;
+    sources?: Array<{
+      page: number;
+      source: string;
+      [key: string]: any;
+    }>;
+    status?: string;
+    error?: string;
+  }
 
 export interface FinancialData {
     income: number;
