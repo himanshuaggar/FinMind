@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export function useStockData(symbol: string) {
+export function useStockData(symbol) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,7 +16,7 @@ export function useStockData(symbol: string) {
       if (cachedData) {
         setData(JSON.parse(cachedData));
       }
-      
+
       const response = await analyzeStock(symbol);
       setData(response);
       await AsyncStorage.setItem(`stock_${symbol}`, JSON.stringify(response));

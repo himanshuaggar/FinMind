@@ -17,10 +17,11 @@ export const initializeMockUser = async () => {
 
       await AsyncStorage.setItem('userId', mockUser.id);
       await AsyncStorage.setItem('userProfile', JSON.stringify(mockUser));
-      
+
       return mockUser;
     }
-    return null;
+    const userProfile = await AsyncStorage.getItem('userProfile');
+    return userProfile ? JSON.parse(userProfile) : null;
   } catch (error) {
     console.error('Error initializing mock user:', error);
     return null;

@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Portfolio, WatchlistItem, Goal, MarketSentiment } from '../types';
 
 const STORAGE_KEYS = {
   PORTFOLIO: 'portfolio',
@@ -9,7 +8,7 @@ const STORAGE_KEYS = {
 };
 
 export const storage = {
-  async get<T>(key: string): Promise<T | null> {
+  async get(key) {
     try {
       const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : null;
@@ -19,19 +18,23 @@ export const storage = {
     }
   },
 
-  async set<T>(key: string, value: T): Promise<void> {
+  async set(key, value) {
     try {
       await AsyncStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
       console.error(`Error writing ${key} to storage:`, error);
+      throw error;
     }
   },
 
-  async remove(key: string): Promise<void> {
+  async remove(key) {
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
       console.error(`Error removing ${key} from storage:`, error);
+      throw error;
     }
   },
+
+  KEYS: STORAGE_KEYS
 };

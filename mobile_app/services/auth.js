@@ -2,18 +2,9 @@ import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import { useAuth } from "@clerk/clerk-expo";
 import { fetchAPI } from "./fetch";
-import { SignIn } from '@clerk/types';
-
-
-interface OAuthResponse {
-    createdSessionId: string | null;
-    signIn?: SignIn;
-    signUp?: any;
-    setActive: (params: { session: string }) => Promise<void>;
-}
 
 export const tokenCache = {
-    async getToken(key: string) {
+    async getToken(key) {
         try {
             const item = await SecureStore.getItemAsync(key);
             if (item) {
@@ -28,7 +19,7 @@ export const tokenCache = {
             return null;
         }
     },
-    async saveToken(key: string, value: string) {
+    async saveToken(key, value) {
         try {
             console.log(`Saving token for key: ${key}`);
             await SecureStore.setItemAsync(key, value);
@@ -38,7 +29,7 @@ export const tokenCache = {
     },
 };
 
-export const googleOAuth = async (startOAuthFlow: () => Promise<OAuthResponse>) => {
+export const googleOAuth = async (startOAuthFlow) => {
     try {
         const existingToken = await tokenCache.getToken('__clerk_client_jwt');
         if (existingToken) {
@@ -48,7 +39,6 @@ export const googleOAuth = async (startOAuthFlow: () => Promise<OAuthResponse>) 
         const { createdSessionId, signIn, signUp } = await startOAuthFlow();
 
         if (createdSessionId) {
-            // Save the new session token immediately
             await tokenCache.saveToken('__clerk_client_jwt', createdSessionId);
 
             if (signUp?.createdUserId) {
@@ -79,7 +69,7 @@ export const googleOAuth = async (startOAuthFlow: () => Promise<OAuthResponse>) 
             success: false,
             message: "Failed to authenticate with Google",
         };
-    } catch (err: any) {
+    } catch (err) {
         console.error("OAuth error:", err);
         return {
             success: false,
@@ -93,7 +83,6 @@ export const signOutUser = async () => {
     try {
         const { signOut } = useAuth();
         await signOut();
-        // Clear any stored tokens
         await SecureStore.deleteItemAsync('__clerk_client_jwt');
     } catch (error) {
         console.error("Error signing out:", error);

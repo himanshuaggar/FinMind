@@ -1,25 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface CacheConfig {
-  expirationMinutes: number;
-}
-
 export class CacheService {
-  private static instance: CacheService;
-  private defaultConfig: CacheConfig = {
-    expirationMinutes: 5
-  };
+  static instance = null;
 
-  private constructor() {}
+  constructor() {
+    this.defaultConfig = {
+      expirationMinutes: 5
+    };
+  }
 
-  static getInstance(): CacheService {
+  static getInstance() {
     if (!CacheService.instance) {
       CacheService.instance = new CacheService();
     }
     return CacheService.instance;
   }
 
-  async set(key: string, data: any, config?: Partial<CacheConfig>) {
+  async set(key, data, config) {
     try {
       const cacheConfig = { ...this.defaultConfig, ...config };
       const cacheData = {
@@ -33,7 +30,7 @@ export class CacheService {
     }
   }
 
-  async get(key: string): Promise<any | null> {
+  async get(key) {
     try {
       const cached = await AsyncStorage.getItem(key);
       if (!cached) return null;
@@ -53,12 +50,13 @@ export class CacheService {
     }
   }
 
-  async clear(key?: string) {
+  async clear(key) {
     try {
       if (key) {
         await AsyncStorage.removeItem(key);
       } else {
-        await AsyncStorage.clear();
+        const keys = await AsyncStorage.getAllKeys();
+        await AsyncStorage.multiRemove(keys);
       }
     } catch (error) {
       console.error('Cache clear error:', error);
