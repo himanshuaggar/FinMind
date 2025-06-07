@@ -8,12 +8,14 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { COLORS, SIZES } from "../../constants/theme";
-import { router } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 
 const InvestmentIdeas = ({ ideas, onPress }) => {
+  const navigation = useNavigation();
+
   const handlePress = (idea) => {
     if (idea.contentUrl) {
-      router.push(`/webview?url=${encodeURIComponent(idea.contentUrl)}`);
+      navigation.navigate("WebView", { url: idea.contentUrl });
     } else {
       onPress(idea);
     }

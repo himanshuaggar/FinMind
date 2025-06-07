@@ -11,7 +11,13 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-, "app/(tabs)/ai-analyst.jsx", "app/_layout.jsx", "app/(auth)/welcome.jsx", "app/(auth)/sign-up.jsx", "app/(auth)/sign-in.jsx", "app/(auth)/_layout.jsx", "app/webview.jsx", "app/onboarding.jsx", "app/index.jsx", "app/(tabs)/index.jsx", "app/(tabs)/news.jsx", "app/(tabs)/stocks.jsx", "app/(tabs)/_layout.jsx", "app/(tabs)/chatbot.jsx", "components/stocks/StockChart.jsx", "components/stocks/StockSearch.jsx", "components/stocks/StockInfo.jsx", "components/stocks/RiskAssessment.jsx", "components/news/NewsItem.jsx", "components/news/NewsFilter.jsx", "components/news/NewsCard.jsx", "components/ai-analyst/ReportAnalysis.jsx", "components/ai-analyst/NewsAnalysis.jsx"  ]
+    "screens/**/*.jsx",
+    "components/**/*.jsx",
+    "navigation/**/*.jsx",
+    "services/**/*.ts",
+    "utils/**/*.js",
+    "hooks/**/*.js",
+    "contexts/**/*.jsx",
+    "constants/**/*.js"
+  ]
 }

@@ -2,12 +2,14 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { COLORS, SIZES } from "../../constants/theme";
-import { router } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 
 const MarketEducation = ({ lesson, onPress }) => {
+  const navigation = useNavigation();
+
   const handlePress = () => {
     if (lesson.contentUrl) {
-      router.push(`/webview?url=${encodeURIComponent(lesson.contentUrl)}`);
+      navigation.navigate("WebView", { url: lesson.contentUrl });
     } else {
       onPress();
     }

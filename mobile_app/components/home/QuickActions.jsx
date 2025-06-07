@@ -1,16 +1,16 @@
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { COLORS, SIZES, SHADOWS } from "../../constants/theme";
 
 export default function QuickActions() {
-  const router = useRouter();
+  const navigation = useNavigation();
 
   const actions = [
-    { icon: "exchange-alt", label: "Transfer", route: "/transfer" },
-    { icon: "piggy-bank", label: "Save", route: "/savings" },
-    { icon: "chart-pie", label: "Invest", route: "/invest" },
-    { icon: "file-invoice", label: "Bills", route: "/bills" },
+    { icon: "exchange-alt", label: "Transfer", route: "Transfer" },
+    { icon: "piggy-bank", label: "Save", route: "Savings" },
+    { icon: "chart-pie", label: "Invest", route: "Invest" },
+    { icon: "file-invoice", label: "Bills", route: "Bills" },
   ];
 
   return (
@@ -21,7 +21,7 @@ export default function QuickActions() {
           <TouchableOpacity
             key={index}
             style={styles.actionItem}
-            onPress={() => {}}
+            onPress={() => navigation.navigate(action.route)}
           >
             <View style={styles.iconContainer}>
               <FontAwesome5

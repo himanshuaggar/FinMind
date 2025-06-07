@@ -1,35 +1,18 @@
-import { useOAuth } from "@clerk/clerk-expo";
-import { router } from "expo-router";
-import { Alert, Image, Text, View, StyleSheet, Linking } from "react-native";
+import { Alert, Image, Text, View, StyleSheet } from "react-native";
 import CustomButton from "./CustomButton";
 import { icons } from "../../constants";
-import { googleOAuth } from "../../services/auth";
 import { COLORS, SIZES } from "../../constants/theme";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../../contexts/AuthContext";
 
 const OAuth = () => {
-  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
-  const { signOut } = useAuth();
+  const { signInWithGoogle } = useAuth();
 
   const handleGoogleSignIn = async () => {
     try {
-      try {
-        await signOut();
-      } catch (e) {
-        console.error("Sign out error:", e);
-      }
-
-      const { createdSessionId, setActive } = await startOAuthFlow();
-
-      if (createdSessionId) {
-        setActive({ session: createdSessionId });
-        router.replace("/(tabs)");
-      } else {
-        Alert.alert("Error", "OAuth error");
-      }
+      await signInWithGoogle();
     } catch (err) {
       console.error("OAuth error:", err);
-      Alert.alert("Error", "OAuth sign in failed");
+      Alert.alert("Error", "Google sign in failed");
     }
   };
 

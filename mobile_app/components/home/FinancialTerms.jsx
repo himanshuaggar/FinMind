@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { COLORS, SIZES } from "../../constants/theme";
-import { router } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 
 const FinancialTerms = ({ terms, onPress }) => {
+  const navigation = useNavigation();
+
   const handlePress = (term) => {
     if (term.contentUrl) {
-      router.push(`/webview?url=${encodeURIComponent(term.contentUrl)}`);
+      navigation.navigate("WebView", { url: term.contentUrl });
     } else {
       onPress(term);
     }
